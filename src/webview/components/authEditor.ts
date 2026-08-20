@@ -2,7 +2,7 @@ import { AUTH_TYPES } from '../../core/constants';
 import type { Auth, AuthApiKey, AuthBasic, AuthBearer, AuthType } from '../../core/types';
 import { el, replace } from '../dom';
 import { icon } from '../icons';
-import { createSelect } from './select';
+import { createSelect, type SelectHandle } from './select';
 
 const AUTH_LABELS: Record<AuthType, string> = {
     none: 'No Auth',
@@ -101,6 +101,13 @@ export function createAuthEditor(options: {
 }): { root: HTMLElement; refresh(): void } {
     const body = el('div', { class: 'auth-body' });
 
+    /*
+     * The api-key "Add to" select is recreated every time `render()` rebuilds
+     * `body` (its popup is portaled onto <body>, see select.ts), so the
+     * previous one must be destroyed or its popup leaks into the document.
+     */
+    let addToSelect: SelectHandle<'header' | 'query'> | null = null;
+
     const select = createSelect<AuthType>({
         value: options.getAuth().type,
         ariaLabel: 'Authentication type',
@@ -171,7 +178,7 @@ export function createAuthEditor(options: {
             text: auth.addTo === 'header' ? 'request headers' : 'query parameters',
         });
 
-        const addTo = createSelect<'header' | 'query'>({
+        addToSelect = createSelect<'header' | 'query'>({
             value: auth.addTo,
             ariaLabel: 'Where to add the API key',
             items: [
@@ -200,7 +207,7 @@ export function createAuthEditor(options: {
                     options.onEdit();
                 })
             ),
-            field('Add to', addTo.root),
+            field('Add to', addToSelect.root),
             hint('The key-value pair is appended to the ', target, '.'),
         ];
     }
@@ -208,6 +215,9 @@ export function createAuthEditor(options: {
     function render(): void {
         const auth = options.getAuth();
         select.setValue(auth.type);
+
+        addToSelect?.destroy();
+        addToSelect = null;
 
         switch (auth.type) {
             case 'bearer':

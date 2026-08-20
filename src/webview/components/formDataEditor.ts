@@ -2,7 +2,7 @@ import { emptyFormField, type FormField } from '../../core/types';
 import { post } from '../bridge';
 import { el, replace } from '../dom';
 import { icon, iconButton } from '../icons';
-import { createSelect } from './select';
+import { createSelect, type SelectHandle } from './select';
 
 function fileName(path: string): string {
     return path.split(/[\\/]/).pop() ?? path;
@@ -12,8 +12,16 @@ export function createFormDataEditor(options: {
     items: FormField[];
     onStructureChange: () => void;
     onEdit: () => void;
-}): { root: HTMLElement; refresh(): void } {
+}): { root: HTMLElement; refresh(): void; destroy(): void } {
     const rows = el('div', { class: 'kv-rows' });
+
+    /*
+     * Each row creates its own type select (its popup is portaled onto
+     * <body>, see select.ts), and `render()` fully rebuilds every row on any
+     * add/remove/toggle — so the old selects must be destroyed explicitly or
+     * their popups pile up in the document forever.
+     */
+    let activeSelects: SelectHandle<'text' | 'file'>[] = [];
 
     const addButton = el(
         'button',
@@ -92,6 +100,8 @@ export function createFormDataEditor(options: {
             },
         });
 
+        activeSelects.push(typeSelect);
+
         return el(
             'div',
             { class: `kv-row is-form${item.enabled ? '' : ' is-disabled'}` },
@@ -140,6 +150,9 @@ export function createFormDataEditor(options: {
     }
 
     function render(): void {
+        activeSelects.forEach((select) => select.destroy());
+        activeSelects = [];
+
         if (options.items.length === 0) {
             replace(rows, el('p', { class: 'empty-hint', text: 'No form fields yet.' }));
             return;
@@ -150,5 +163,12 @@ export function createFormDataEditor(options: {
 
     render();
 
-    return { root, refresh: render };
+    return {
+        root,
+        refresh: render,
+        destroy() {
+            activeSelects.forEach((select) => select.destroy());
+            activeSelects = [];
+        },
+    };
 }

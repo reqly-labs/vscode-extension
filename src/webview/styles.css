@@ -241,6 +241,13 @@ body {
 
 /* ---------------------------------------------------------------- panels */
 
+/*
+ * Side-by-side vs. stacked is a viewport-width call, so it's driven by a
+ * media query rather than a ResizeObserver: `.split` tracks the panel's full
+ * width anyway, and a stylesheet rule can't "miss" the initial layout the way
+ * a JS observer notification occasionally did in the VS Code webview host.
+ * splitView.ts uses the same 1080px threshold when deciding drag axis.
+ */
 .split {
     display: grid;
     flex: 1;
@@ -249,18 +256,9 @@ body {
     grid-template-columns: minmax(0, 1fr);
 }
 
-.split.is-horizontal {
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-columns: var(--split-a, 1fr) 8px var(--split-b, 1fr);
-}
-
 .split-handle {
     position: relative;
     cursor: row-resize;
-}
-
-.split.is-horizontal .split-handle {
-    cursor: col-resize;
 }
 
 .split-handle::after {
@@ -272,8 +270,19 @@ body {
     transition: background var(--transition-fast);
 }
 
-.split.is-horizontal .split-handle::after {
-    inset: 0 3px;
+@media (min-width: 1080px) {
+    .split {
+        grid-template-rows: minmax(0, 1fr);
+        grid-template-columns: var(--split-a, 1fr) 8px var(--split-b, 1fr);
+    }
+
+    .split-handle {
+        cursor: col-resize;
+    }
+
+    .split-handle::after {
+        inset: 0 3px;
+    }
 }
 
 .split-handle:hover::after,
@@ -590,11 +599,17 @@ input[type='checkbox']:checked::after {
 
 .select-popup {
     display: none;
-    position: absolute;
+    /*
+     * Portaled onto <body> (see select.ts) rather than nested inside
+     * `.select`: several triggers (the method selector, the body-type
+     * selector...) sit inside an ancestor with `overflow: hidden`/`auto` for
+     * rounded corners or scrolling, and `position: fixed` alone does not
+     * escape that clipping unless the element also leaves that ancestor's
+     * subtree. `top`/`left` are set inline by select.ts from the trigger's
+     * bounding rect.
+     */
+    position: fixed;
     z-index: 40;
-    top: calc(100% + 4px);
-    left: 0;
-    min-width: 100%;
     padding: 4px;
     background: var(--color-surface-raised);
     border: 1px solid var(--color-border);
@@ -602,7 +617,7 @@ input[type='checkbox']:checked::after {
     box-shadow: var(--shadow-lg);
 }
 
-.select.is-open .select-popup {
+.select-popup.is-open {
     display: block;
 }
 

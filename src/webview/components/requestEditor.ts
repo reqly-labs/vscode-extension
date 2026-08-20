@@ -129,7 +129,20 @@ export function createRequestEditor(): HTMLElement {
         return actions;
     }
 
+    /*
+     * The multipart editor owns per-row selects whose popups are portaled
+     * onto <body> (see select.ts). renderBody() swaps `bodyPane`'s content
+     * wholesale on every call — including re-entrant ones triggered by
+     * `emit('body')` for unrelated reasons, like a file finishing being
+     * picked — so the previous multipart editor must be torn down explicitly
+     * or its popups are orphaned instead of being removed with its DOM.
+     */
+    let activeFormDataEditor: { destroy(): void } | null = null;
+
     function renderBody(): void {
+        activeFormDataEditor?.destroy();
+        activeFormDataEditor = null;
+
         const type = snapshot.bodyType;
 
         if (type === 'none') {
@@ -174,6 +187,7 @@ export function createRequestEditor(): HTMLElement {
                 onStructureChange: structural,
             });
 
+            activeFormDataEditor = editor;
             replace(bodyPane, editor.root);
             return;
         }
