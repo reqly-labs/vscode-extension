@@ -31,10 +31,6 @@ export interface EditorHandle {
     focus(): void;
 }
 
-/**
- * A textarea layered over a highlighted `<pre>`. Cheaper than shipping a full
- * editor into the webview, and the caret behaviour stays native.
- */
 export function createEditor(options: {
     value: string;
     language: Language;
@@ -59,7 +55,6 @@ export function createEditor(options: {
     const paint = () => {
         const value = input.value;
         gutter.textContent = gutterFor(countLines(value));
-        // The trailing newline keeps the last line's highlight box from collapsing.
         layer.innerHTML = `${highlight(value, language)}\n`;
     };
 
@@ -113,7 +108,6 @@ export interface ViewerHandle {
     setWrap(wrap: boolean): void;
 }
 
-/** Read-only counterpart used for response bodies. */
 export function createViewer(wrap: boolean): ViewerHandle {
     const gutter = el('div', { class: 'code-gutter' });
     const layer = el('pre', { class: 'code-layer is-readonly' });

@@ -1,9 +1,3 @@
-/*
- * Colour and radius tokens come from @reqly/design-system and are injected by
- * the extension host as a `:root` / `:root.reqly-dark` pair, so the panel
- * follows the editor's light or dark theme with Reqly's own palette.
- */
-
 * {
     box-sizing: border-box;
 }
@@ -59,8 +53,6 @@ body {
     outline-offset: 1px;
 }
 
-/* ---------------------------------------------------------------- topbar */
-
 .topbar {
     display: flex;
     align-items: center;
@@ -108,8 +100,6 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-
-/* --------------------------------------------------------------- url bar */
 
 .url-bar {
     display: flex;
@@ -239,15 +229,6 @@ body {
     height: 14px;
 }
 
-/* ---------------------------------------------------------------- panels */
-
-/*
- * Side-by-side vs. stacked is a viewport-width call, so it's driven by a
- * media query rather than a ResizeObserver: `.split` tracks the panel's full
- * width anyway, and a stylesheet rule can't "miss" the initial layout the way
- * a JS observer notification occasionally did in the VS Code webview host.
- * splitView.ts uses the same 1080px threshold when deciding drag axis.
- */
 .split {
     display: grid;
     flex: 1;
@@ -335,8 +316,6 @@ body {
     gap: 10px;
 }
 
-/* ------------------------------------------------------------------ tabs */
-
 .tabs {
     display: flex;
     align-items: stretch;
@@ -386,8 +365,6 @@ body {
 .is-hidden {
     display: none !important;
 }
-
-/* ---------------------------------------------------------------- fields */
 
 .field {
     width: 100%;
@@ -536,8 +513,6 @@ input[type='checkbox']:checked::after {
     color: var(--color-text-subtle);
 }
 
-/* ---------------------------------------------------------------- select */
-
 .select {
     position: relative;
     flex-shrink: 0;
@@ -599,15 +574,6 @@ input[type='checkbox']:checked::after {
 
 .select-popup {
     display: none;
-    /*
-     * Portaled onto <body> (see select.ts) rather than nested inside
-     * `.select`: several triggers (the method selector, the body-type
-     * selector...) sit inside an ancestor with `overflow: hidden`/`auto` for
-     * rounded corners or scrolling, and `position: fixed` alone does not
-     * escape that clipping unless the element also leaves that ancestor's
-     * subtree. `top`/`left` are set inline by select.ts from the trigger's
-     * bounding rect.
-     */
     position: fixed;
     z-index: 40;
     padding: 4px;
@@ -677,8 +643,6 @@ input[type='checkbox']:checked::after {
 .method-options {
     color: var(--color-text-muted);
 }
-
-/* ------------------------------------------------------------------ menu */
 
 .menu {
     position: relative;
@@ -782,8 +746,6 @@ input[type='checkbox']:checked::after {
     color: var(--color-text-subtle);
 }
 
-/* ------------------------------------------------------------ kv editors */
-
 .kv-editor {
     display: flex;
     flex-direction: column;
@@ -870,8 +832,6 @@ input[type='checkbox']:checked::after {
 .binary-picker .empty-hint {
     word-break: break-all;
 }
-
-/* -------------------------------------------------------------- auth tab */
 
 .auth-editor {
     display: flex;
@@ -971,8 +931,6 @@ code {
     color: var(--color-text);
 }
 
-/* -------------------------------------------------------------- body tab */
-
 .body-tab {
     overflow: hidden;
 }
@@ -997,8 +955,6 @@ code {
     flex-direction: column;
     overflow: auto;
 }
-
-/* ----------------------------------------------------------- code editor */
 
 .code-editor {
     display: flex;
@@ -1115,8 +1071,6 @@ code {
     color: var(--color-text-subtle);
     font-style: italic;
 }
-
-/* -------------------------------------------------------------- response */
 
 .response-meta {
     display: flex;
@@ -1291,8 +1245,6 @@ code {
     font-family: var(--font-mono);
     font-size: 11px;
 }
-
-/* ------------------------------------------------------------ placeholder */
 
 .placeholder {
     display: flex;

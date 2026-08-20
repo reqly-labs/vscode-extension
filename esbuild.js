@@ -3,16 +3,9 @@ const esbuild = require('esbuild');
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
-/**
- * The two bundles build in parallel, but `$esbuild-watch` treats the first
- * "build finished" as the signal that the background task is ready — and F5
- * would then launch against a half-written `dist`. So the markers are emitted
- * once around the whole batch rather than once per bundle.
- */
 let pending = 0;
 let batchErrors = [];
 
-/** @type {import('esbuild').Plugin} */
 const problemMatcherPlugin = {
     name: 'esbuild-problem-matcher',
 
@@ -47,7 +40,6 @@ const problemMatcherPlugin = {
     },
 };
 
-/** @type {import('esbuild').BuildOptions} */
 const shared = {
     bundle: true,
     minify: production,
@@ -57,7 +49,6 @@ const shared = {
     plugins: [problemMatcherPlugin],
 };
 
-/** @type {import('esbuild').BuildOptions[]} */
 const targets = [
     {
         ...shared,

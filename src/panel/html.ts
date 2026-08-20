@@ -13,10 +13,6 @@ function nonce(): string {
     return value;
 }
 
-/**
- * Both palettes are emitted up front and switched by a class on `<html>`, so
- * following the editor's theme never costs a webview reload.
- */
 const THEME_CSS = createThemeCss(light, dark, {
     lightSelector: ':root',
     darkSelector: ':root.reqly-dark',

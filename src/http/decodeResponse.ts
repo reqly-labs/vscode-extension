@@ -23,10 +23,6 @@ function decodeText(data: Buffer, contentType: string): string {
     }
 }
 
-/**
- * Payloads whose media type is not text-shaped are surfaced as a preview or a
- * download hint rather than being dumped into the body editor as mojibake.
- */
 function isTextual(mime: string): boolean {
     return (
         mime.startsWith('text/') ||

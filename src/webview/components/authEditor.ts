@@ -101,11 +101,6 @@ export function createAuthEditor(options: {
 }): { root: HTMLElement; refresh(): void } {
     const body = el('div', { class: 'auth-body' });
 
-    /*
-     * The api-key "Add to" select is recreated every time `render()` rebuilds
-     * `body` (its popup is portaled onto <body>, see select.ts), so the
-     * previous one must be destroyed or its popup leaks into the document.
-     */
     let addToSelect: SelectHandle<'header' | 'query'> | null = null;
 
     const select = createSelect<AuthType>({

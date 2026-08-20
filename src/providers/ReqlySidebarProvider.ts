@@ -2,10 +2,6 @@ import * as vscode from 'vscode';
 import { REPO_URL } from '../brand';
 import { renderSidebarPage } from './sidebarPage';
 
-/**
- * The activity-bar entry point. It stays intentionally small — the request
- * workspace itself lives in an editor panel where there is room for it.
- */
 export class ReqlySidebarProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'reqly.sidebar';
 

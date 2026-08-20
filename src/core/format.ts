@@ -26,7 +26,6 @@ export function formatJson(value: string): string {
     }
 }
 
-/** Cheap structural indent — good enough for previewing XML and HTML. */
 export function formatXml(value: string): string {
     const flat = value.replace(/>\s*</g, '><').trim();
     const lines: string[] = [];

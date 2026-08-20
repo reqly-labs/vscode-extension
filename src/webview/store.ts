@@ -6,16 +6,11 @@ export interface AppState extends WebviewState {
     loading: boolean;
     response: HttpResponse | null;
     error: RequestError | null;
-    /** Increments per send so stale replies from cancelled runs are ignored. */
     requestId: number;
     prettyPrint: boolean;
     wrapLines: boolean;
 }
 
-/**
- * Channels let a component redraw only the region it owns. Keystrokes inside a
- * text field never emit, which is what keeps focus and caret position intact.
- */
 export type Channel =
     | 'method'
     | 'url'

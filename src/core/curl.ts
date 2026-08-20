@@ -95,7 +95,6 @@ function parseHeader(raw: string): { key: string; value: string } | null {
     return { key: raw.slice(0, index).trim(), value: raw.slice(index + 1).trim() };
 }
 
-/** Recognises a pasted `curl` invocation and lifts it into request fields. */
 export function parseCurlCommand(input: string): ParsedCurl | null {
     const trimmed = input.trim();
 
@@ -284,10 +283,7 @@ function shellEscape(value: string): string {
     return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-/** Renders the current request as a copy-pasteable `curl` command. */
 export function buildCurlCommand(snapshot: RequestSnapshot): string {
-    // Each entry becomes one continued shell line, so flags stay next to their
-    // values instead of being split across the line breaks.
     const lines: string[] = [];
     const head = snapshot.method === 'GET' ? ['curl'] : ['curl', '-X', snapshot.method];
 

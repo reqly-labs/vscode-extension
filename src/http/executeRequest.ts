@@ -57,10 +57,6 @@ function headerValue(headers: [string, string][], name: string): string | undefi
     return headers.find(([key]) => key.toLowerCase() === lower)?.[1];
 }
 
-/**
- * Strips credentials and body-shaped headers when a redirect crosses to a
- * different origin, matching what browsers and curl do.
- */
 function headersForRedirect(
     headers: Record<string, string>,
     from: URL,
@@ -115,7 +111,6 @@ function performExchange(
                 method,
                 headers,
                 rejectUnauthorized: settings.rejectUnauthorized,
-                // Redirects are followed by hand so the hop chain stays visible.
                 signal,
             },
             (response) => {
@@ -157,9 +152,6 @@ function performExchange(
         });
 
         request.on('socket', (socket) => {
-            // A pooled keep-alive socket already paid for DNS, TCP and TLS, and
-            // would never emit those events again — attaching here would only
-            // pile up listeners on a socket shared by every later request.
             if (!socket.connecting) {
                 return;
             }
@@ -212,7 +204,6 @@ function toTransportError(error: NodeJS.ErrnoException, url: URL): TransportErro
     }
 }
 
-/** Sends the request, following redirects and accumulating the hop chain. */
 export async function executeRequest(
     wire: WireRequest,
     settings: RequestSettings,

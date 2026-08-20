@@ -21,7 +21,6 @@ function findHeader(headers: Record<string, string>, name: string): string | und
     return Object.keys(headers).find((key) => key.toLowerCase() === lower);
 }
 
-/** Sets a header only when the user has not already provided it themselves. */
 function setDefaultHeader(headers: Record<string, string>, name: string, value: string): void {
     if (!findHeader(headers, name)) {
         headers[name] = value;
@@ -90,11 +89,6 @@ async function readBinary(path: string): Promise<Buffer> {
     }
 }
 
-/**
- * Turns the panel's snapshot into everything the transport needs: a resolved
- * URL with query parameters applied, the effective header set including
- * authentication, and the encoded body.
- */
 export async function buildRequest(snapshot: RequestSnapshot): Promise<WireRequest> {
     const url = normalizeUrl(snapshot.url);
     const headers: Record<string, string> = {};

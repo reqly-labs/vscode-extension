@@ -29,15 +29,10 @@ function inferBodyType(contentType: string, body: string): BodyType {
     }
 }
 
-/**
- * Arrays are spliced rather than reassigned so the editors already bound to
- * them keep working against the same references.
- */
 function fill<T>(target: T[], next: T[]): void {
     target.splice(0, target.length, ...next);
 }
 
-/** Returns true when the text was a cURL command and the request was replaced. */
 export function applyCurl(text: string): boolean {
     const parsed = parseCurlCommand(text);
 
@@ -67,7 +62,6 @@ export function applyCurl(text: string): boolean {
 
     fill(snapshot.params, [emptyKeyValue()]);
 
-    // Query parameters travel inside the pasted URL; lift them into the table.
     try {
         const url = new URL(parsed.url);
 
@@ -85,9 +79,7 @@ export function applyCurl(text: string): boolean {
             url.search = '';
             snapshot.url = url.toString();
         }
-    } catch {
-        // A relative or templated URL simply stays as typed.
-    }
+    } catch {}
 
     if (parsed.multipartFields) {
         snapshot.bodyType = 'multipart';

@@ -15,12 +15,6 @@ export function createFormDataEditor(options: {
 }): { root: HTMLElement; refresh(): void; destroy(): void } {
     const rows = el('div', { class: 'kv-rows' });
 
-    /*
-     * Each row creates its own type select (its popup is portaled onto
-     * <body>, see select.ts), and `render()` fully rebuilds every row on any
-     * add/remove/toggle — so the old selects must be destroyed explicitly or
-     * their popups pile up in the document forever.
-     */
     let activeSelects: SelectHandle<'text' | 'file'>[] = [];
 
     const addButton = el(

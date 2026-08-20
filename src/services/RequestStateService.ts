@@ -4,7 +4,6 @@ import { createSettings, createSnapshot } from '../core/types';
 
 const STORAGE_KEY = 'reqly.requestState';
 
-/** Keeps the in-flight request across window reloads and panel disposals. */
 export class RequestStateService {
     constructor(private readonly memento: vscode.Memento) {}
 

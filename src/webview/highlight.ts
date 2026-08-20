@@ -64,10 +64,6 @@ function highlightXml(source: string): string {
     return result + escapeHtml(source.slice(last));
 }
 
-/**
- * Highlighting is skipped for very large payloads — the regex pass is linear
- * but the resulting DOM is not, and a multi-megabyte body would stall paint.
- */
 const MAX_HIGHLIGHT_CHARS = 400_000;
 
 export function highlight(source: string, language: Language): string {

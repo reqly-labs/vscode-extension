@@ -17,7 +17,6 @@ export function post(message: PanelMessage): void {
 
 let persistTimer: number | undefined;
 
-/** Coalesces the flood of edits a user makes into one write per idle moment. */
 export function schedulePersist(): void {
     window.clearTimeout(persistTimer);
     persistTimer = window.setTimeout(() => post({ type: 'persist', state: persistable() }), 300);

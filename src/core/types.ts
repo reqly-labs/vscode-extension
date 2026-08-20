@@ -13,7 +13,6 @@ export interface KeyValue {
 
 export interface FormField extends KeyValue {
     type: 'text' | 'file';
-    /** Absolute path chosen through the host file picker, for `type: 'file'`. */
     filePath?: string;
 }
 
@@ -58,11 +57,9 @@ export interface RequestSnapshot {
 export interface RequestSettings {
     timeout: number;
     followRedirects: boolean;
-    /** Allow self-signed / expired certificates. Off by default. */
     rejectUnauthorized: boolean;
 }
 
-/** Wall-clock breakdown of a single exchange, in milliseconds. */
 export interface ResponseTimings {
     dns: number;
     connect: number;
@@ -80,16 +77,11 @@ export interface HttpResponse {
     size: number;
     timings: ResponseTimings;
     contentType: string;
-    /** Decoded text body, or base64 when `binary` is set. */
     body: string;
-    /** `data:` URI for image payloads, so the panel can render a preview. */
     previewUri: string | null;
-    /** The payload is not text; `body` holds base64 and is only offered for saving. */
     binary: boolean;
     truncated: boolean;
-    /** Chain of `Location` hops followed before this response, if any. */
     redirects: string[];
-    /** Final URL, after redirects and query interpolation. */
     finalUrl: string;
 }
 

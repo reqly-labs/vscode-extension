@@ -4,14 +4,12 @@ import { icon } from '../icons';
 export interface SelectOption<T extends string> {
     value: T;
     label: string;
-    /** Extra class applied to the label, used for method colouring. */
     className?: string;
 }
 
 export interface SelectHandle<T extends string> {
     root: HTMLElement;
     setValue(value: T): void;
-    /** Removes the portaled popup. Required for selects recreated on every render. */
     destroy(): void;
 }
 
@@ -33,10 +31,6 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
-// Capturing phase, so scrolling *any* inner pane (params, headers, form
-// fields...) closes an open popup instead of leaving it stranded away from
-// its trigger — `scroll` does not bubble, so a non-capturing listener would
-// only ever see scrolls on `document` itself.
 document.addEventListener(
     'scroll',
     () => {
@@ -78,14 +72,6 @@ export function createSelect<T extends string>(options: {
     const label = el('span', { class: 'select-label' });
     const list = el('div', { class: 'select-list', role: 'listbox' });
 
-    /*
-     * Several triggers (the method selector, the body-type selector...) sit
-     * inside an ancestor with `overflow: hidden`/`auto` for rounded corners
-     * or scrolling. `position: fixed` alone does not escape that clipping in
-     * real browsers unless the element is also moved out of that ancestor's
-     * subtree — so the popup is portaled onto `document.body` and positioned
-     * from the trigger's bounding rect instead of living inside `.select`.
-     */
     const popup = el('div', { class: `select-popup ${extraClass}`.trim() }, list);
     document.body.appendChild(popup);
 

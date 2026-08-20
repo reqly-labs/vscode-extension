@@ -16,11 +16,6 @@ export class RequestPanel {
     private readonly disposables: vscode.Disposable[] = [];
     private inFlight: AbortController | undefined;
 
-    /**
-     * Raw bytes of the last response. Saving reads from here rather than
-     * shipping the payload back from the panel, which also keeps "Save"
-     * working for bodies too large to preview.
-     */
     private lastBody: Buffer | undefined;
 
     private constructor(
@@ -63,7 +58,6 @@ export class RequestPanel {
         return RequestPanel.current;
     }
 
-    /** Clears the stored request and reloads the panel with a blank slate. */
     async reset(): Promise<void> {
         await this.store.write({
             snapshot: createSnapshot(),

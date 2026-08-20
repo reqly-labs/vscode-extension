@@ -12,7 +12,6 @@ export interface SidebarPageOptions {
     isDark: boolean;
 }
 
-/** Markup for the activity-bar view, kept separate so it can be rendered standalone. */
 export function renderSidebarPage({ mascotUri, cspSource, isDark }: SidebarPageOptions): string {
     return `<!DOCTYPE html>
 <html lang="en" class="${isDark ? 'reqly-dark' : ''}">
