@@ -1,71 +1,70 @@
-# reqly README
+# Reqly for VS Code
 
-This is the README for your extension "reqly". After writing up a brief description, we recommend including the following sections.
+Bring [Reqly](https://github.com/arturbomtempo-dev/reqly)'s HTTP client experience directly into
+VS Code. Compose a request, send it, and read the response without leaving the editor — styled with
+the Reqly design system and themed alongside your editor.
+
+Requests run in the extension host over Node's own HTTP stack, so there is no browser sandbox in the
+way: `localhost` APIs, self-signed certificates, and arbitrary headers all work.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Every method** — `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` and `OPTIONS`.
+- **Query parameters and headers** with per-row enable toggles.
+- **Bodies** — JSON, XML, plain text, URL-encoded, multipart form data (with real file attachments)
+  and raw binary files.
+- **Authentication** — Bearer token, Basic auth and API key, placed in a header or the query string.
+- **Response inspector** — status, duration and size, syntax-highlighted body with pretty-print and
+  wrapping, full response headers, and image previews.
+- **Timing waterfall** — DNS, TCP, TLS, time-to-first-byte and download, plus the redirect chain and
+  final URL.
+- **cURL in and out** — paste a `curl` command into the URL field to import it, or copy the current
+  request back out as one.
+- **Request settings** — timeout, redirect following, and TLS certificate verification.
+- **Automatic decompression** for `gzip`, `deflate` and `brotli`, with charset-aware text decoding.
 
-For example if there is an image subfolder under your extension project workspace:
+## Getting started
 
-\!\[feature X\]\(images/feature-x.png\)
+1. Open the Reqly view from the activity bar and choose **New Request**, or run
+   **Reqly: Open HTTP Client** from the command palette.
+2. Pick a method, type a URL, and press <kbd>Enter</kbd>.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Commands
 
-## Requirements
+| Command                   | Description                                     |
+| ------------------------- | ----------------------------------------------- |
+| `Reqly: Open HTTP Client` | Opens the request panel in the editor area.     |
+| `Reqly: New Request`      | Clears the panel and starts from a blank slate. |
+| `Reqly: Send Request`     | Sends whatever the panel currently holds.       |
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## Keyboard shortcuts
 
-## Extension Settings
+| Shortcut                                        | Action                          |
+| ----------------------------------------------- | ------------------------------- |
+| <kbd>Enter</kbd> in the URL field               | Send the request                |
+| <kbd>Ctrl</kbd> <kbd>Enter</kbd>                | Send from anywhere in the panel |
+| <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>Enter</kbd> | Send from anywhere in VS Code   |
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+## Development
 
-For example:
+```bash
+npm install
+npm run watch      # rebuild the extension and webview bundles on change
+```
 
-This extension contributes the following settings:
+Press <kbd>F5</kbd> to launch an Extension Development Host.
 
-- `myExtension.enable`: Enable/disable this extension.
-- `myExtension.thing`: Set to `blah` to do something.
+```bash
+npm run check-types   # TypeScript
+npm run lint          # ESLint
+npm run compile-tests # build the unit tests into out/
+npm test              # run them
+```
 
-## Known Issues
+The extension bundles two entry points: `src/extension.ts` runs in the Node extension host and owns
+the transport, while `src/webview/main.ts` runs in the panel. They share the pure modules under
+`src/core`, and communicate through the typed messages in `src/core/messages.ts`.
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+## License
 
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-- [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-- Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-- Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-- Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-- [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-- [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+MIT

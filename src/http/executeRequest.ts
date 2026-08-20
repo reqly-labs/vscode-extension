@@ -1,0 +1,279 @@
+import * as http from 'node:http';
+import * as https from 'node:https';
+import type { Duplex } from 'node:stream';
+import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
+import { MAX_REDIRECTS } from '../core/constants';
+import type { HttpMethod, RequestSettings, ResponseTimings } from '../core/types';
+import type { WireRequest } from './buildRequest';
+
+export class TransportError extends Error {
+    constructor(
+        message: string,
+        readonly detail?: string
+    ) {
+        super(message);
+    }
+}
+
+export interface RawResponse {
+    status: number;
+    statusText: string;
+    httpVersion: string;
+    headers: [string, string][];
+    body: Buffer;
+    timings: ResponseTimings;
+    redirects: string[];
+    finalUrl: string;
+}
+
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+function decompressor(encoding: string | undefined): Duplex | null {
+    switch (encoding?.trim().toLowerCase()) {
+        case 'gzip':
+        case 'x-gzip':
+            return createGunzip();
+        case 'deflate':
+            return createInflate();
+        case 'br':
+            return createBrotliDecompress();
+        default:
+            return null;
+    }
+}
+
+function collectHeaders(raw: string[]): [string, string][] {
+    const headers: [string, string][] = [];
+
+    for (let i = 0; i < raw.length; i += 2) {
+        headers.push([raw[i], raw[i + 1]]);
+    }
+
+    return headers;
+}
+
+function headerValue(headers: [string, string][], name: string): string | undefined {
+    const lower = name.toLowerCase();
+    return headers.find(([key]) => key.toLowerCase() === lower)?.[1];
+}
+
+/**
+ * Strips credentials and body-shaped headers when a redirect crosses to a
+ * different origin, matching what browsers and curl do.
+ */
+function headersForRedirect(
+    headers: Record<string, string>,
+    from: URL,
+    to: URL,
+    keepBody: boolean
+): Record<string, string> {
+    const sameOrigin = from.origin === to.origin;
+    const next: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(headers)) {
+        const lower = key.toLowerCase();
+
+        if (!sameOrigin && (lower === 'authorization' || lower === 'cookie')) {
+            continue;
+        }
+
+        if (!keepBody && (lower === 'content-length' || lower === 'content-type')) {
+            continue;
+        }
+
+        next[key] = value;
+    }
+
+    return next;
+}
+
+interface Exchange {
+    status: number;
+    statusText: string;
+    httpVersion: string;
+    headers: [string, string][];
+    body: Buffer;
+    timings: ResponseTimings;
+}
+
+function performExchange(
+    url: URL,
+    method: HttpMethod,
+    headers: Record<string, string>,
+    body: Buffer | undefined,
+    settings: RequestSettings,
+    signal: AbortSignal
+): Promise<Exchange> {
+    return new Promise<Exchange>((resolve, reject) => {
+        const transport = url.protocol === 'https:' ? https : http;
+        const start = performance.now();
+        const marks = { dns: 0, connect: 0, tls: 0, firstByte: 0 };
+
+        const request = transport.request(
+            url,
+            {
+                method,
+                headers,
+                rejectUnauthorized: settings.rejectUnauthorized,
+                // Redirects are followed by hand so the hop chain stays visible.
+                signal,
+            },
+            (response) => {
+                marks.firstByte = performance.now() - start;
+
+                const rawHeaders = collectHeaders(response.rawHeaders);
+                const decoder = decompressor(headerValue(rawHeaders, 'content-encoding'));
+                const stream = decoder ? response.pipe(decoder) : response;
+                const chunks: Buffer[] = [];
+
+                stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+                stream.on('error', (error: NodeJS.ErrnoException) =>
+                    reject(new TransportError('Failed to read the response body.', error.message))
+                );
+
+                stream.on('end', () =>
+                    resolve({
+                        status: response.statusCode ?? 0,
+                        statusText: response.statusMessage ?? '',
+                        httpVersion: response.httpVersion,
+                        headers: rawHeaders,
+                        body: Buffer.concat(chunks),
+                        timings: {
+                            dns: Math.round(marks.dns),
+                            connect: Math.round(marks.connect),
+                            tls: Math.round(marks.tls),
+                            firstByte: Math.round(marks.firstByte),
+                            download: Math.round(performance.now() - start - marks.firstByte),
+                            total: Math.round(performance.now() - start),
+                        },
+                    })
+                );
+            }
+        );
+
+        request.setTimeout(settings.timeout, () => {
+            request.destroy(new TransportError(`Request timed out after ${settings.timeout} ms.`));
+        });
+
+        request.on('socket', (socket) => {
+            // A pooled keep-alive socket already paid for DNS, TCP and TLS, and
+            // would never emit those events again — attaching here would only
+            // pile up listeners on a socket shared by every later request.
+            if (!socket.connecting) {
+                return;
+            }
+
+            socket.once('lookup', () => (marks.dns = performance.now() - start));
+            socket.once('connect', () => (marks.connect = performance.now() - start));
+            socket.once('secureConnect', () => (marks.tls = performance.now() - start));
+        });
+
+        request.on('error', (error: NodeJS.ErrnoException) => {
+            if (error instanceof TransportError) {
+                reject(error);
+                return;
+            }
+
+            reject(toTransportError(error, url));
+        });
+
+        if (body) {
+            request.write(body);
+        }
+
+        request.end();
+    });
+}
+
+function toTransportError(error: NodeJS.ErrnoException, url: URL): TransportError {
+    switch (error.code) {
+        case 'ABORT_ERR':
+            return new TransportError('Request cancelled.');
+        case 'ENOTFOUND':
+        case 'EAI_AGAIN':
+            return new TransportError(`Could not resolve host "${url.hostname}".`, error.message);
+        case 'ECONNREFUSED':
+            return new TransportError(`Connection refused by ${url.host}.`, error.message);
+        case 'ECONNRESET':
+            return new TransportError('The connection was reset by the server.', error.message);
+        case 'ETIMEDOUT':
+            return new TransportError(`Connection to ${url.host} timed out.`, error.message);
+        case 'DEPTH_ZERO_SELF_SIGNED_CERT':
+        case 'SELF_SIGNED_CERT_IN_CHAIN':
+        case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
+        case 'CERT_HAS_EXPIRED':
+            return new TransportError(
+                'TLS certificate could not be verified. Disable certificate validation in the request settings to continue.',
+                error.message
+            );
+        default:
+            return new TransportError(error.message || 'The request failed.', error.code);
+    }
+}
+
+/** Sends the request, following redirects and accumulating the hop chain. */
+export async function executeRequest(
+    wire: WireRequest,
+    settings: RequestSettings,
+    signal: AbortSignal
+): Promise<RawResponse> {
+    let url = wire.url;
+    let method = wire.method;
+    let headers = wire.headers;
+    let body = wire.body;
+
+    const redirects: string[] = [];
+    const totals: ResponseTimings = {
+        dns: 0,
+        connect: 0,
+        tls: 0,
+        firstByte: 0,
+        download: 0,
+        total: 0,
+    };
+
+    for (let hop = 0; ; hop++) {
+        const exchange = await performExchange(url, method, headers, body, settings, signal);
+
+        totals.dns = exchange.timings.dns;
+        totals.connect = exchange.timings.connect;
+        totals.tls = exchange.timings.tls;
+        totals.firstByte = exchange.timings.firstByte;
+        totals.download = exchange.timings.download;
+        totals.total += exchange.timings.total;
+
+        const location = headerValue(exchange.headers, 'location');
+        const isRedirect = REDIRECT_STATUSES.has(exchange.status) && Boolean(location);
+
+        if (!settings.followRedirects || !isRedirect) {
+            return {
+                status: exchange.status,
+                statusText: exchange.statusText,
+                httpVersion: exchange.httpVersion,
+                headers: exchange.headers,
+                body: exchange.body,
+                timings: totals,
+                redirects,
+                finalUrl: url.toString(),
+            };
+        }
+
+        if (hop >= MAX_REDIRECTS) {
+            throw new TransportError(`Too many redirects (stopped after ${MAX_REDIRECTS} hops).`);
+        }
+
+        const target = new URL(location as string, url);
+        const dropsBody = exchange.status === 303 || (exchange.status < 307 && method === 'POST');
+
+        redirects.push(target.toString());
+        headers = headersForRedirect(headers, url, target, !dropsBody);
+
+        if (dropsBody) {
+            method = 'GET';
+            body = undefined;
+        }
+
+        url = target;
+    }
+}

@@ -1,21 +1,84 @@
 {
     "name": "reqly",
+    "publisher": "arturbomtempo-dev",
     "displayName": "Reqly",
-    "description": "Bring Reqly's HTTP client experience directly int VS Code.",
-    "version": "0.0.1",
+    "description": "Bring Reqly's HTTP client experience directly into VS Code.",
+    "version": "0.1.0",
+    "icon": "media/icon.png",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/reqly-labs/vscode-extension"
+    },
     "engines": {
         "vscode": "^1.134.0"
     },
     "categories": [
-        "Other"
+        "Other",
+        "Testing"
+    ],
+    "keywords": [
+        "http",
+        "rest",
+        "api",
+        "client",
+        "reqly"
     ],
     "activationEvents": [],
     "main": "./dist/extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "reqly.helloWorld",
-                "title": "Hello World"
+                "command": "reqly.openPanel",
+                "title": "Open HTTP Client",
+                "category": "Reqly"
+            },
+            {
+                "command": "reqly.newRequest",
+                "title": "New Request",
+                "category": "Reqly",
+                "icon": "$(add)"
+            },
+            {
+                "command": "reqly.sendRequest",
+                "title": "Send Request",
+                "category": "Reqly",
+                "icon": "$(play)"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "reqly",
+                    "title": "Reqly",
+                    "icon": "media/reqly.svg"
+                }
+            ]
+        },
+        "views": {
+            "reqly": [
+                {
+                    "type": "webview",
+                    "id": "reqly.sidebar",
+                    "name": "Reqly",
+                    "icon": "media/reqly.svg"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "reqly.newRequest",
+                    "when": "view == reqly.sidebar",
+                    "group": "navigation"
+                }
+            ]
+        },
+        "keybindings": [
+            {
+                "command": "reqly.sendRequest",
+                "key": "ctrl+alt+enter",
+                "mac": "cmd+alt+enter"
             }
         ]
     },
@@ -26,13 +89,16 @@
         "watch:esbuild": "node esbuild.js --watch",
         "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
         "package": "npm run check-types && npm run lint && node esbuild.js --production",
-        "compile-tests": "tsc -p . --outDir out",
-        "watch-tests": "tsc -p . -w --outDir out",
+        "compile-tests": "tsc -p tsconfig.test.json",
+        "watch-tests": "tsc -p tsconfig.test.json -w",
         "pretest": "npm run compile-tests && npm run compile && npm run lint",
         "check-types": "tsc --noEmit",
         "lint": "eslint src",
         "test": "vscode-test",
         "format": "prettier --write ."
+    },
+    "dependencies": {
+        "@reqly/design-system": "^1.1.1"
     },
     "devDependencies": {
         "@types/mocha": "^10.0.10",

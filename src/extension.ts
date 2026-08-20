@@ -1,13 +1,29 @@
 import * as vscode from 'vscode';
+import { RequestPanel } from './panel/RequestPanel';
+import { ReqlySidebarProvider } from './providers/ReqlySidebarProvider';
+import { RequestStateService } from './services/RequestStateService';
 
-export function activate(context: vscode.ExtensionContext) {
-    console.log('Congratulations, your extension "reqly" is now active!');
+export function activate(context: vscode.ExtensionContext): void {
+    const store = new RequestStateService(context.workspaceState);
 
-    const disposable = vscode.commands.registerCommand('reqly.helloWorld', () => {
-        vscode.window.showInformationMessage('Hello World from Reqly!');
-    });
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            ReqlySidebarProvider.viewType,
+            new ReqlySidebarProvider(context.extensionUri)
+        ),
 
-    context.subscriptions.push(disposable);
+        vscode.commands.registerCommand('reqly.openPanel', () => {
+            RequestPanel.show(context, store);
+        }),
+
+        vscode.commands.registerCommand('reqly.newRequest', async () => {
+            await RequestPanel.show(context, store).reset();
+        }),
+
+        vscode.commands.registerCommand('reqly.sendRequest', () => {
+            RequestPanel.show(context, store).triggerSend();
+        })
+    );
 }
 
-export function deactivate() {}
+export function deactivate(): void {}
