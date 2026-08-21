@@ -36,8 +36,7 @@
             {
                 "command": "reqly.newRequest",
                 "title": "New Request",
-                "category": "Reqly",
-                "icon": "$(add)"
+                "category": "Reqly"
             },
             {
                 "command": "reqly.sendRequest",
@@ -62,15 +61,6 @@
                     "id": "reqly.sidebar",
                     "name": "Reqly",
                     "icon": "media/reqly.svg"
-                }
-            ]
-        },
-        "menus": {
-            "view/title": [
-                {
-                    "command": "reqly.newRequest",
-                    "when": "view == reqly.sidebar",
-                    "group": "navigation"
                 }
             ]
         },

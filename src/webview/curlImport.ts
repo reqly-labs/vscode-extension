@@ -1,4 +1,5 @@
 import { parseCurlCommand } from '../core/curl';
+import { formatJson, formatXml } from '../core/format';
 import { createId, emptyFormField, emptyKeyValue, type BodyType } from '../core/types';
 import { state } from './store';
 
@@ -90,34 +91,65 @@ export function applyCurl(text: string): boolean {
         if (snapshot.multipartBody.length === 0) {
             snapshot.multipartBody.push(emptyFormField());
         }
-
-        return true;
-    }
-
-    const contentType =
-        Object.entries(parsed.headers).find(([key]) => key.toLowerCase() === 'content-type')?.[1] ??
-        '';
-
-    const body = parsed.data ?? '';
-    const bodyType = inferBodyType(contentType, body);
-
-    snapshot.bodyType = bodyType;
-    snapshot.body = bodyType === 'form' ? '' : body;
-    fill(snapshot.multipartBody, [emptyFormField()]);
-
-    if (bodyType === 'form' && body) {
-        const search = new URLSearchParams(body);
-        const fields = [...search].map(([key, value]) => ({
-            id: createId(),
-            key,
-            value,
-            enabled: true,
-        }));
-
-        fill(snapshot.formBody, fields.length > 0 ? fields : [emptyKeyValue()]);
     } else {
-        fill(snapshot.formBody, [emptyKeyValue()]);
+        const contentType =
+            Object.entries(parsed.headers).find(([key]) => key.toLowerCase() === 'content-type')?.[1] ??
+            '';
+
+        const body = parsed.data ?? '';
+        const bodyType = inferBodyType(contentType, body);
+
+        snapshot.bodyType = bodyType;
+
+        if (bodyType === 'form') {
+            snapshot.body = '';
+        } else if (bodyType === 'json') {
+            snapshot.body = formatJson(body);
+        } else if (bodyType === 'xml') {
+            snapshot.body = formatXml(body);
+        } else {
+            snapshot.body = body;
+        }
+        fill(snapshot.multipartBody, [emptyFormField()]);
+
+        if (bodyType === 'form' && body) {
+            const search = new URLSearchParams(body);
+            const fields = [...search].map(([key, value]) => ({
+                id: createId(),
+                key,
+                value,
+                enabled: true,
+            }));
+
+            fill(snapshot.formBody, fields.length > 0 ? fields : [emptyKeyValue()]);
+        } else {
+            fill(snapshot.formBody, [emptyKeyValue()]);
+        }
     }
+
+    activateRelevantTab();
 
     return true;
+}
+
+function activateRelevantTab(): void {
+    const { snapshot } = state;
+
+    const hasParams = snapshot.params.some((param) => param.enabled && param.key.trim());
+    const hasHeaders = snapshot.headers.some((header) => header.enabled && header.key.trim());
+    const hasBody =
+        snapshot.bodyType === 'multipart'
+            ? snapshot.multipartBody.some((field) => field.enabled && field.key.trim())
+            : snapshot.bodyType !== 'none';
+    const hasAuth = snapshot.auth.type !== 'none';
+
+    if (hasParams) {
+        state.activeRequestTab = 'params';
+    } else if (hasHeaders) {
+        state.activeRequestTab = 'headers';
+    } else if (hasBody) {
+        state.activeRequestTab = 'body';
+    } else if (hasAuth) {
+        state.activeRequestTab = 'auth';
+    }
 }

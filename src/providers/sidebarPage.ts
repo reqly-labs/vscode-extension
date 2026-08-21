@@ -108,25 +108,6 @@ export function renderSidebarPage({ mascotUri, cspSource, isDark }: SidebarPageO
             width: 14px;
             height: 14px;
         }
-
-        .tips {
-            margin: 16px 0 0;
-            padding-top: 14px;
-            border-top: 1px solid var(--color-border-subtle);
-            font-size: 11px;
-            line-height: 1.8;
-            color: var(--color-text-subtle);
-        }
-
-        kbd {
-            padding: 1px 5px;
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-xs);
-            background: var(--color-surface-raised);
-            font-family: var(--font-mono);
-            font-size: 10px;
-            color: var(--color-text-muted);
-        }
     </style>
 </head>
 <body>
@@ -144,11 +125,6 @@ export function renderSidebarPage({ mascotUri, cspSource, isDark }: SidebarPageO
         <button data-command="openPanel">Open HTTP Client</button>
         <button data-command="repository">View on GitHub</button>
     </div>
-
-    <p class="tips">
-        Send with <kbd>Ctrl</kbd> <kbd>Enter</kbd><br />
-        Paste a <kbd>curl</kbd> command into the URL field to import it.
-    </p>
 
     <script>
         const vscode = acquireVsCodeApi();

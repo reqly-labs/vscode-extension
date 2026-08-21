@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { REPO_URL } from '../brand';
 import { renderSidebarPage } from './sidebarPage';
+
+const EXTENSION_ORG_URL = 'https://github.com/reqly-labs';
 
 export class ReqlySidebarProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'reqly.sidebar';
@@ -37,7 +38,7 @@ export class ReqlySidebarProvider implements vscode.WebviewViewProvider {
                     void vscode.commands.executeCommand('reqly.openPanel');
                     break;
                 case 'repository':
-                    void vscode.env.openExternal(vscode.Uri.parse(REPO_URL));
+                    void vscode.env.openExternal(vscode.Uri.parse(EXTENSION_ORG_URL));
                     break;
             }
         });

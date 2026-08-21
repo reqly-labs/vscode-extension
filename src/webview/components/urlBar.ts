@@ -55,7 +55,7 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
                     urlInput.value = state.snapshot.url;
                     methodSelect.setValue(state.snapshot.method);
                     shell.className = `url-shell method-border-${state.snapshot.method.toLowerCase()}`;
-                    emit('params', 'headers', 'body', 'auth');
+                    emit('params', 'headers', 'body', 'auth', 'requestTab');
                     schedulePersist();
                     post({ type: 'notify', level: 'info', text: 'cURL command imported.' });
                 }
