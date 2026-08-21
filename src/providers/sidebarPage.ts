@@ -118,11 +118,11 @@ export function renderSidebarPage({ mascotUri, cspSource, isDark }: SidebarPageO
     </div>
 
     <div class="actions">
-        <button class="primary" data-command="newRequest">
+        <button class="primary" data-command="newRequest" title="Opens the client with a blank request.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             New Request
         </button>
-        <button data-command="openPanel">Open HTTP Client</button>
+        <button data-command="openPanel" title="Opens the client where you left off.">Open HTTP Client</button>
         <button data-command="repository">View on GitHub</button>
     </div>
 
