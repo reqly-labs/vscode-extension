@@ -93,8 +93,9 @@ export function applyCurl(text: string): boolean {
         }
     } else {
         const contentType =
-            Object.entries(parsed.headers).find(([key]) => key.toLowerCase() === 'content-type')?.[1] ??
-            '';
+            Object.entries(parsed.headers).find(
+                ([key]) => key.toLowerCase() === 'content-type'
+            )?.[1] ?? '';
 
         const body = parsed.data ?? '';
         const bodyType = inferBodyType(contentType, body);
