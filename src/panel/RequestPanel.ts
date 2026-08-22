@@ -18,6 +18,9 @@ export class RequestPanel {
 
     private lastBody: Buffer | undefined;
 
+    private ready = false;
+    private pending: 'send' | undefined;
+
     private constructor(
         private readonly panel: vscode.WebviewPanel,
         private readonly extensionUri: vscode.Uri,
@@ -66,11 +69,23 @@ export class RequestPanel {
             activeResponseTab: 'body',
         });
 
+        if (!this.ready) {
+            return;
+        }
+
+        this.ready = false;
+        this.pending = undefined;
         this.panel.webview.html = renderPanelHtml(this.panel.webview, this.extensionUri);
     }
 
     triggerSend(): void {
         this.panel.reveal(this.panel.viewColumn);
+
+        if (!this.ready) {
+            this.pending = 'send';
+            return;
+        }
+
         this.send({ type: 'command', name: 'send' });
     }
 
@@ -90,6 +105,8 @@ export class RequestPanel {
     private async handle(message: PanelMessage): Promise<void> {
         switch (message.type) {
             case 'ready':
+                this.ready = true;
+
                 this.send({
                     type: 'init',
                     state: this.store.read(),
@@ -98,6 +115,11 @@ export class RequestPanel {
                         .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'mascot.png'))
                         .toString(),
                 });
+
+                if (this.pending) {
+                    this.send({ type: 'command', name: this.pending });
+                    this.pending = undefined;
+                }
                 break;
 
             case 'persist':

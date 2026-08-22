@@ -64,7 +64,7 @@ export interface ResponseTimings {
     dns: number;
     connect: number;
     tls: number;
-    firstByte: number;
+    wait: number;
     download: number;
     total: number;
 }

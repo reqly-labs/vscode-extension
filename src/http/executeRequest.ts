@@ -134,14 +134,7 @@ function performExchange(
                         httpVersion: response.httpVersion,
                         headers: rawHeaders,
                         body: Buffer.concat(chunks),
-                        timings: {
-                            dns: Math.round(marks.dns),
-                            connect: Math.round(marks.connect),
-                            tls: Math.round(marks.tls),
-                            firstByte: Math.round(marks.firstByte),
-                            download: Math.round(performance.now() - start - marks.firstByte),
-                            total: Math.round(performance.now() - start),
-                        },
+                        timings: durations(marks, performance.now() - start),
                     })
                 );
             }
@@ -176,6 +169,23 @@ function performExchange(
 
         request.end();
     });
+}
+
+function durations(
+    marks: { dns: number; connect: number; tls: number; firstByte: number },
+    elapsed: number
+): ResponseTimings {
+    const span = (from: number, to: number) => Math.round(Math.max(0, to - from));
+    const connected = Math.max(marks.tls, marks.connect, marks.dns);
+
+    return {
+        dns: span(0, marks.dns),
+        connect: marks.connect > 0 ? span(marks.dns, marks.connect) : 0,
+        tls: marks.tls > 0 ? span(marks.connect, marks.tls) : 0,
+        wait: span(connected, marks.firstByte),
+        download: span(marks.firstByte, elapsed),
+        total: Math.round(elapsed),
+    };
 }
 
 function toTransportError(error: NodeJS.ErrnoException, url: URL): TransportError {
@@ -219,7 +229,7 @@ export async function executeRequest(
         dns: 0,
         connect: 0,
         tls: 0,
-        firstByte: 0,
+        wait: 0,
         download: 0,
         total: 0,
     };
@@ -227,11 +237,11 @@ export async function executeRequest(
     for (let hop = 0; ; hop++) {
         const exchange = await performExchange(url, method, headers, body, settings, signal);
 
-        totals.dns = exchange.timings.dns;
-        totals.connect = exchange.timings.connect;
-        totals.tls = exchange.timings.tls;
-        totals.firstByte = exchange.timings.firstByte;
-        totals.download = exchange.timings.download;
+        totals.dns += exchange.timings.dns;
+        totals.connect += exchange.timings.connect;
+        totals.tls += exchange.timings.tls;
+        totals.wait += exchange.timings.wait;
+        totals.download += exchange.timings.download;
         totals.total += exchange.timings.total;
 
         const location = headerValue(exchange.headers, 'location');

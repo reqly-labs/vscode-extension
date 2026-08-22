@@ -1,17 +1,7 @@
 import * as vscode from 'vscode';
 import { createThemeCss, dark, light } from '@reqly/design-system';
 import { APP_NAME } from '../brand';
-
-function nonce(): string {
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let value = '';
-
-    for (let i = 0; i < 32; i += 1) {
-        value += alphabet[Math.floor(Math.random() * alphabet.length)];
-    }
-
-    return value;
-}
+import { createNonce } from '../utils/nonce';
 
 const THEME_CSS = createThemeCss(light, dark, {
     lightSelector: ':root',
@@ -24,7 +14,7 @@ export function renderPanelHtml(webview: vscode.Webview, extensionUri: vscode.Ur
 
     const script = asset('dist', 'webview.js');
     const styles = asset('dist', 'webview.css');
-    const token = nonce();
+    const token = createNonce();
 
     const csp = [
         `default-src 'none'`,

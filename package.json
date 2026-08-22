@@ -2,13 +2,25 @@
     "name": "reqly",
     "publisher": "arturbomtempo-dev",
     "displayName": "Reqly",
-    "description": "Bring Reqly's HTTP client experience directly into VS Code.",
-    "version": "0.1.0",
+    "description": "A modern, lightweight HTTP client that brings the Reqly experience directly into VS Code.",
+    "version": "1.0.0",
     "icon": "media/icon.png",
     "license": "MIT",
+    "author": {
+        "name": "Artur Bomtempo Colen",
+        "url": "https://www.arturbomtempo.dev"
+    },
+    "homepage": "https://github.com/reqly-labs/vscode-extension#readme",
+    "bugs": {
+        "url": "https://github.com/reqly-labs/vscode-extension/issues"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/reqly-labs/vscode-extension"
+    },
+    "galleryBanner": {
+        "color": "#1B2620",
+        "theme": "dark"
     },
     "engines": {
         "vscode": "^1.134.0"
@@ -22,7 +34,11 @@
         "rest",
         "api",
         "client",
-        "reqly"
+        "reqly",
+        "curl",
+        "request",
+        "endpoint",
+        "testing"
     ],
     "activationEvents": [],
     "main": "./dist/extension.js",
@@ -96,6 +112,7 @@
         "@types/vscode": "^1.134.0",
         "@vscode/test-cli": "^0.0.15",
         "@vscode/test-electron": "^3.0.0",
+        "@vscode/vsce": "^3.9.2",
         "esbuild": "^0.28.1",
         "eslint": "^10.5.0",
         "npm-run-all": "^4.1.5",

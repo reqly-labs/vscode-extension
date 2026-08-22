@@ -1,0 +1,22 @@
+name: Publish Extension
+
+on:
+    push:
+        tags:
+            - 'v*'
+
+jobs:
+    publish:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - run: npm ci
+
+            - run: xvfb-run -a npm test
+
+            - run: npx @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}

@@ -290,12 +290,9 @@ export function createResponseView(): HTMLElement {
 
         const phases: [string, number][] = [
             ['DNS lookup', timings.dns],
-            ['TCP connect', Math.max(0, timings.connect - timings.dns)],
-            ['TLS handshake', timings.tls > 0 ? Math.max(0, timings.tls - timings.connect) : 0],
-            [
-                'Waiting (TTFB)',
-                Math.max(0, timings.firstByte - Math.max(timings.tls, timings.connect)),
-            ],
+            ['TCP connect', timings.connect],
+            ['TLS handshake', timings.tls],
+            ['Waiting (TTFB)', timings.wait],
             ['Download', timings.download],
         ];
 

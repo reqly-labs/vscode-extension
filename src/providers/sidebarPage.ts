@@ -10,15 +10,21 @@ export interface SidebarPageOptions {
     mascotUri: string;
     cspSource: string;
     isDark: boolean;
+    nonce: string;
 }
 
-export function renderSidebarPage({ mascotUri, cspSource, isDark }: SidebarPageOptions): string {
+export function renderSidebarPage({
+    mascotUri,
+    cspSource,
+    isDark,
+    nonce,
+}: SidebarPageOptions): string {
     return `<!DOCTYPE html>
 <html lang="en" class="${isDark ? 'reqly-dark' : ''}">
 <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource}; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
-    <style>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource}; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
+    <style nonce="${nonce}">
         ${THEME_CSS}
 
         * {
@@ -126,7 +132,7 @@ export function renderSidebarPage({ mascotUri, cspSource, isDark }: SidebarPageO
         <button data-command="repository">View on GitHub</button>
     </div>
 
-    <script>
+    <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
 
         document.querySelectorAll('button').forEach((button) => {

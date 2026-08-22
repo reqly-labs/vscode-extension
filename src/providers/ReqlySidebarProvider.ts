@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
+import { createNonce } from '../utils/nonce';
 import { renderSidebarPage } from './sidebarPage';
 
-const EXTENSION_ORG_URL = 'https://github.com/reqly-labs';
+const REPOSITORY_URL = 'https://github.com/reqly-labs/vscode-extension';
 
 export class ReqlySidebarProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'reqly.sidebar';
@@ -21,6 +22,7 @@ export class ReqlySidebarProvider implements vscode.WebviewViewProvider {
                     .toString(),
                 cspSource: view.webview.cspSource,
                 isDark: !isLightTheme(),
+                nonce: createNonce(),
             });
         };
 
@@ -38,7 +40,7 @@ export class ReqlySidebarProvider implements vscode.WebviewViewProvider {
                     void vscode.commands.executeCommand('reqly.openPanel');
                     break;
                 case 'repository':
-                    void vscode.env.openExternal(vscode.Uri.parse(EXTENSION_ORG_URL));
+                    void vscode.env.openExternal(vscode.Uri.parse(REPOSITORY_URL));
                     break;
             }
         });
