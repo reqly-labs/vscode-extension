@@ -45,13 +45,20 @@
     "contributes": {
         "commands": [
             {
-                "command": "reqly.openPanel",
-                "title": "Open HTTP Client",
-                "category": "Reqly"
-            },
-            {
                 "command": "reqly.newRequest",
                 "title": "New Request",
+                "category": "Reqly",
+                "icon": "$(add)"
+            },
+            {
+                "command": "reqly.newCollection",
+                "title": "New Collection",
+                "category": "Reqly",
+                "icon": "$(new-folder)"
+            },
+            {
+                "command": "reqly.openPanel",
+                "title": "Open HTTP Client",
                 "category": "Reqly"
             },
             {
@@ -65,18 +72,6 @@
                 "title": "Save Request",
                 "category": "Reqly",
                 "icon": "$(save)"
-            },
-            {
-                "command": "reqly.newCollection",
-                "title": "New Collection",
-                "category": "Reqly",
-                "icon": "$(new-folder)"
-            },
-            {
-                "command": "reqly.newRequestIn",
-                "title": "New Request in Collection",
-                "category": "Reqly",
-                "icon": "$(add)"
             }
         ],
         "viewsContainers": {
@@ -95,13 +90,6 @@
                     "id": "reqly.collections",
                     "name": "Collections",
                     "icon": "media/reqly.svg"
-                },
-                {
-                    "type": "webview",
-                    "id": "reqly.sidebar",
-                    "name": "About",
-                    "icon": "media/reqly.svg",
-                    "visibility": "collapsed"
                 }
             ]
         },
@@ -111,7 +99,21 @@
                 "key": "ctrl+alt+enter",
                 "mac": "cmd+alt+enter"
             }
-        ]
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "reqly.newRequest",
+                    "when": "view == reqly.collections",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "reqly.newCollection",
+                    "when": "view == reqly.collections",
+                    "group": "navigation@2"
+                }
+            ]
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run package",

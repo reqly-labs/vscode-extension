@@ -42,5 +42,4 @@ export type CollectionsViewMessage =
     | { type: 'rename'; id: string; name: string }
     | { type: 'duplicate'; id: string }
     | { type: 'delete'; id: string }
-    | { type: 'move'; id: string; targetId: string | null }
-    | { type: 'openPanel' };
+    | { type: 'move'; id: string; targetId: string | null };

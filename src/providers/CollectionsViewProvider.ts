@@ -211,7 +211,7 @@ export class CollectionsViewProvider implements vscode.WebviewViewProvider {
                 break;
 
             case 'newCollection':
-                await this.create(() => this.workspaceService.createCollection('New Collection'));
+                await this.createCollection();
                 break;
 
             case 'newFolder':
@@ -221,22 +221,9 @@ export class CollectionsViewProvider implements vscode.WebviewViewProvider {
                 );
                 break;
 
-            case 'newRequest': {
-                if (message.id) {
-                    this.expanded.add(message.id);
-                }
-
-                const result = await this.workspaceService.createRequest(message.id, 'New Request');
-
-                if (!result.ok) {
-                    void vscode.window.showWarningMessage(result.reason);
-                    return;
-                }
-
-                await this.revealForRename(result.id);
-                await this.callbacks.openRequest(result.id);
+            case 'newRequest':
+                await this.createRequest(message.id);
                 break;
-            }
 
             case 'rename': {
                 const result = await this.workspaceService.rename(message.id, message.name);
@@ -278,11 +265,27 @@ export class CollectionsViewProvider implements vscode.WebviewViewProvider {
                 }
                 break;
             }
-
-            case 'openPanel':
-                await vscode.commands.executeCommand('reqly.openPanel');
-                break;
         }
+    }
+
+    async createCollection(): Promise<void> {
+        await this.create(() => this.workspaceService.createCollection('New Collection'));
+    }
+
+    async createRequest(parentId: ParentId): Promise<void> {
+        if (parentId) {
+            this.expanded.add(parentId);
+        }
+
+        const result = await this.workspaceService.createRequest(parentId, 'New Request');
+
+        if (!result.ok) {
+            void vscode.window.showWarningMessage(result.reason);
+            return;
+        }
+
+        await this.revealForRename(result.id);
+        await this.callbacks.openRequest(result.id);
     }
 
     private async create(

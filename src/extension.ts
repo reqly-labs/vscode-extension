@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
-import { registerCollectionCommands } from './commands/collections';
 import { RequestPanel, type PanelDependencies } from './panel/RequestPanel';
 import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
-import { ReqlySidebarProvider } from './providers/ReqlySidebarProvider';
 import { RequestStateService } from './services/RequestStateService';
 import { WorkspaceService } from './services/WorkspaceService';
 
@@ -28,10 +26,6 @@ export function activate(context: vscode.ExtensionContext): void {
         onActiveChanged: () => collectionsView.refresh(),
     };
 
-    const openRequest = async (id: string) => {
-        await RequestPanel.show(context, deps).openRequest(id);
-    };
-
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             CollectionsViewProvider.viewType,
@@ -39,20 +33,19 @@ export function activate(context: vscode.ExtensionContext): void {
             { webviewOptions: { retainContextWhenHidden: true } }
         ),
 
-        vscode.window.registerWebviewViewProvider(
-            ReqlySidebarProvider.viewType,
-            new ReqlySidebarProvider(context.extensionUri)
-        ),
-
         workspaceService,
         workspaceService.onDidChange(() => collectionsView.refresh()),
 
-        vscode.commands.registerCommand('reqly.openPanel', () => {
-            RequestPanel.show(context, deps);
+        vscode.commands.registerCommand('reqly.newRequest', async () => {
+            await collectionsView.createRequest(null);
         }),
 
-        vscode.commands.registerCommand('reqly.newRequest', async () => {
-            await RequestPanel.show(context, deps).reset();
+        vscode.commands.registerCommand('reqly.newCollection', async () => {
+            await collectionsView.createCollection();
+        }),
+
+        vscode.commands.registerCommand('reqly.openPanel', () => {
+            RequestPanel.show(context, deps);
         }),
 
         vscode.commands.registerCommand('reqly.sendRequest', () => {
@@ -61,12 +54,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
         vscode.commands.registerCommand('reqly.saveRequest', () => {
             RequestPanel.show(context, deps).triggerSave();
-        }),
-
-        ...registerCollectionCommands({
-            workspaceService,
-            reveal: (id) => collectionsView.reveal(id),
-            openRequest,
         })
     );
 

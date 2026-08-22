@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { APP_NAME } from '../brand';
 import { pickContainer } from '../commands/collections';
 import type { ActiveRequestInfo, HostMessage, PanelMessage, WebviewState } from '../core/messages';
-import { createSettings, createSnapshot, type RequestSnapshot } from '../core/types';
+import type { RequestSnapshot } from '../core/types';
 import { ancestorsOf, getRequest, requestLabel } from '../core/workspace';
 import { BuildError, buildRequest } from '../http/buildRequest';
 import { decodeResponse } from '../http/decodeResponse';
@@ -117,27 +117,6 @@ export class RequestPanel {
         }
 
         this.send({ type: 'loadRequest', state, active: this.describeActive() });
-    }
-
-    async reset(): Promise<void> {
-        this.activeRequestId = null;
-        this.deps.onActiveChanged?.();
-
-        await this.store.write({
-            snapshot: createSnapshot(),
-            settings: createSettings(),
-            activeRequestTab: 'params',
-            activeResponseTab: 'body',
-            activeRequestId: null,
-        });
-
-        if (!this.ready) {
-            return;
-        }
-
-        this.ready = false;
-        this.pending = undefined;
-        this.panel.webview.html = renderPanelHtml(this.panel.webview, this.extensionUri);
     }
 
     triggerSend(): void {

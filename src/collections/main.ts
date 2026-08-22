@@ -54,31 +54,11 @@ function iconButton(name: IconName, label: string, onClick: (event: MouseEvent) 
     return button;
 }
 
-function buildToolbar(): HTMLElement {
-    const bar = el('div', 'toolbar');
-
-    const title = el('span', 'toolbar-title');
-    title.textContent = 'Collections';
-
-    const actions = el('div', 'toolbar-actions');
-
-    actions.append(
-        iconButton('plus', 'New request', () => post({ type: 'newRequest', id: null })),
-        iconButton('newCollection', 'New collection', () => post({ type: 'newCollection' })),
-        iconButton('panel', 'Open HTTP client', () => post({ type: 'openPanel' }))
-    );
-
-    bar.append(title, actions);
-
-    return bar;
-}
-
 function buildEmptyState(): HTMLElement {
     const empty = el('div', 'empty');
 
     const text = el('p');
-    text.textContent =
-        'No collections yet. Group related requests together, or keep working with a single loose request.';
+    text.textContent = 'No requests yet.';
 
     const actions = el('div', 'empty-actions');
 
@@ -344,7 +324,6 @@ function beginRename(id: string): void {
 function render(): void {
     closeContextMenu();
     root.replaceChildren();
-    root.appendChild(buildToolbar());
 
     if (rows.length === 0) {
         root.appendChild(buildEmptyState());
