@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { registerCollectionCommands } from './commands/collections';
 import { RequestPanel, type PanelDependencies } from './panel/RequestPanel';
-import { CollectionsTreeProvider } from './providers/CollectionsTreeProvider';
+import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
+import { ReqlySidebarProvider } from './providers/ReqlySidebarProvider';
 import { RequestStateService } from './services/RequestStateService';
 import { WorkspaceService } from './services/WorkspaceService';
 
@@ -9,25 +10,22 @@ export function activate(context: vscode.ExtensionContext): void {
     const store = new RequestStateService(context.workspaceState);
     const workspaceService = new WorkspaceService(context.globalState);
 
-    const treeProvider = new CollectionsTreeProvider(workspaceService, () => RequestPanel.activeId);
+    const collectionsView = new CollectionsViewProvider(
+        context.extensionUri,
+        workspaceService,
+        context.globalState,
+        {
+            openRequest: async (id) => {
+                await RequestPanel.show(context, deps).openRequest(id);
+            },
+            activeRequestId: () => RequestPanel.activeId,
+        }
+    );
 
     const deps: PanelDependencies = {
         store,
         workspaceService,
-        onActiveChanged: () => treeProvider.refresh(),
-    };
-
-    const treeView = vscode.window.createTreeView(CollectionsTreeProvider.viewType, {
-        treeDataProvider: treeProvider,
-        dragAndDropController: treeProvider,
-        showCollapseAll: true,
-        canSelectMany: false,
-    });
-
-    const reveal = async (id: string, options?: { expand?: boolean }) => {
-        try {
-            await treeView.reveal(id, { select: true, focus: false, expand: options?.expand });
-        } catch {}
+        onActiveChanged: () => collectionsView.refresh(),
     };
 
     const openRequest = async (id: string) => {
@@ -35,9 +33,19 @@ export function activate(context: vscode.ExtensionContext): void {
     };
 
     context.subscriptions.push(
-        treeView,
+        vscode.window.registerWebviewViewProvider(
+            CollectionsViewProvider.viewType,
+            collectionsView,
+            { webviewOptions: { retainContextWhenHidden: true } }
+        ),
+
+        vscode.window.registerWebviewViewProvider(
+            ReqlySidebarProvider.viewType,
+            new ReqlySidebarProvider(context.extensionUri)
+        ),
+
         workspaceService,
-        workspaceService.onDidChange(() => treeProvider.refresh()),
+        workspaceService.onDidChange(() => collectionsView.refresh()),
 
         vscode.commands.registerCommand('reqly.openPanel', () => {
             RequestPanel.show(context, deps);
@@ -45,7 +53,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
         vscode.commands.registerCommand('reqly.newRequest', async () => {
             await RequestPanel.show(context, deps).reset();
-            treeProvider.refresh();
         }),
 
         vscode.commands.registerCommand('reqly.sendRequest', () => {
@@ -56,7 +63,11 @@ export function activate(context: vscode.ExtensionContext): void {
             RequestPanel.show(context, deps).triggerSave();
         }),
 
-        ...registerCollectionCommands({ workspaceService, reveal, openRequest })
+        ...registerCollectionCommands({
+            workspaceService,
+            reveal: (id) => collectionsView.reveal(id),
+            openRequest,
+        })
     );
 
     if (workspaceService.loadRepairs.length > 0) {

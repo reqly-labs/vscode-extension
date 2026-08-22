@@ -66,6 +66,14 @@ const targets = [
         platform: 'browser',
         target: ['chrome120'],
     },
+    {
+        ...shared,
+        entryPoints: ['src/collections/main.ts'],
+        outfile: 'dist/collections.js',
+        format: 'iife',
+        platform: 'browser',
+        target: ['chrome120'],
+    },
 ];
 
 async function main() {
