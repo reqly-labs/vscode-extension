@@ -58,8 +58,10 @@ async function promptForName(
                 return 'The name cannot be empty.';
             }
 
-            if (trimmed.toLowerCase() !== value.trim().toLowerCase() &&
-                normalizedTaken.has(trimmed.toLowerCase())) {
+            if (
+                trimmed.toLowerCase() !== value.trim().toLowerCase() &&
+                normalizedTaken.has(trimmed.toLowerCase())
+            ) {
                 return 'Something with that name already sits here.';
             }
 
@@ -91,9 +93,7 @@ function containerFor(workspace: Workspace, targetId: string | undefined): Paren
     return parent?.id ?? null;
 }
 
-export function registerCollectionCommands(
-    context: CollectionCommandContext
-): vscode.Disposable[] {
+export function registerCollectionCommands(context: CollectionCommandContext): vscode.Disposable[] {
     const { workspaceService, reveal, openRequest } = context;
 
     const newCollection = vscode.commands.registerCommand('reqly.newCollection', async () => {
@@ -173,35 +173,40 @@ export function registerCollectionCommands(
         }
     );
 
-    const rename = vscode.commands.registerCommand('reqly.renameNode', async (argument?: unknown) => {
-        const workspace = workspaceService.workspace;
-        const targetId = resolveTargetId(workspace, argument);
+    const rename = vscode.commands.registerCommand(
+        'reqly.renameNode',
+        async (argument?: unknown) => {
+            const workspace = workspaceService.workspace;
+            const targetId = resolveTargetId(workspace, argument);
 
-        if (!targetId) {
-            void vscode.window.showWarningMessage('Pick an item in the Collections view to rename.');
-            return;
+            if (!targetId) {
+                void vscode.window.showWarningMessage(
+                    'Pick an item in the Collections view to rename.'
+                );
+                return;
+            }
+
+            const node = getNode(workspace, targetId);
+
+            if (!node) {
+                return;
+            }
+
+            const parentId = ancestorsOf(workspace, targetId).at(-1)?.id ?? null;
+
+            const name = await promptForName(
+                `Rename ${node.kind}`,
+                node.name,
+                siblingNames(workspace, parentId, targetId)
+            );
+
+            if (name === undefined || name.trim() === node.name) {
+                return;
+            }
+
+            report(await workspaceService.rename(targetId, name));
         }
-
-        const node = getNode(workspace, targetId);
-
-        if (!node) {
-            return;
-        }
-
-        const parentId = ancestorsOf(workspace, targetId).at(-1)?.id ?? null;
-
-        const name = await promptForName(
-            `Rename ${node.kind}`,
-            node.name,
-            siblingNames(workspace, parentId, targetId)
-        );
-
-        if (name === undefined || name.trim() === node.name) {
-            return;
-        }
-
-        report(await workspaceService.rename(targetId, name));
-    });
+    );
 
     const duplicate = vscode.commands.registerCommand(
         'reqly.duplicateNode',
@@ -223,39 +228,44 @@ export function registerCollectionCommands(
         }
     );
 
-    const remove = vscode.commands.registerCommand('reqly.deleteNode', async (argument?: unknown) => {
-        const workspace = workspaceService.workspace;
-        const targetId = resolveTargetId(workspace, argument);
+    const remove = vscode.commands.registerCommand(
+        'reqly.deleteNode',
+        async (argument?: unknown) => {
+            const workspace = workspaceService.workspace;
+            const targetId = resolveTargetId(workspace, argument);
 
-        if (!targetId) {
-            void vscode.window.showWarningMessage('Pick an item in the Collections view to delete.');
-            return;
+            if (!targetId) {
+                void vscode.window.showWarningMessage(
+                    'Pick an item in the Collections view to delete.'
+                );
+                return;
+            }
+
+            const node = getNode(workspace, targetId);
+
+            if (!node) {
+                return;
+            }
+
+            const affected = subtreeIds(workspace, targetId).length - 1;
+            const detail =
+                affected > 0
+                    ? `This also deletes ${affected} item${affected === 1 ? '' : 's'} inside it.`
+                    : undefined;
+
+            const confirmation = await vscode.window.showWarningMessage(
+                `Delete "${node.name}"?`,
+                { modal: true, detail },
+                'Delete'
+            );
+
+            if (confirmation !== 'Delete') {
+                return;
+            }
+
+            report(await workspaceService.remove(targetId));
         }
-
-        const node = getNode(workspace, targetId);
-
-        if (!node) {
-            return;
-        }
-
-        const affected = subtreeIds(workspace, targetId).length - 1;
-        const detail =
-            affected > 0
-                ? `This also deletes ${affected} item${affected === 1 ? '' : 's'} inside it.`
-                : undefined;
-
-        const confirmation = await vscode.window.showWarningMessage(
-            `Delete "${node.name}"?`,
-            { modal: true, detail },
-            'Delete'
-        );
-
-        if (confirmation !== 'Delete') {
-            return;
-        }
-
-        report(await workspaceService.remove(targetId));
-    });
+    );
 
     const openFromTree = vscode.commands.registerCommand(
         'reqly.openRequest',
@@ -282,7 +292,11 @@ export async function pickContainer(
     }
 
     const choices: Choice[] = [
-        { id: null, label: '$(list-flat) No collection', description: 'Keep it as a loose request' },
+        {
+            id: null,
+            label: '$(list-flat) No collection',
+            description: 'Keep it as a loose request',
+        },
     ];
 
     const walk = (parentId: ParentId, depth: number) => {

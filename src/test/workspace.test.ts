@@ -123,7 +123,10 @@ suite('workspace mutations address a node by its own id', () => {
             })
         );
 
-        assert.equal(getRequest(updated.workspace, requestId)?.snapshot.url, 'https://api.test/users');
+        assert.equal(
+            getRequest(updated.workspace, requestId)?.snapshot.url,
+            'https://api.test/users'
+        );
         assert.equal(getRequest(updated.workspace, sibling.id)?.snapshot.url, '');
     });
 });

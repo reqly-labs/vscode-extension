@@ -169,12 +169,10 @@ export function ancestorsOf(workspace: Workspace, id: string): GroupNode[] {
 }
 
 export type WorkspaceResult =
-    | { ok: true; workspace: Workspace; id: string }
-    | { ok: false; reason: string };
+    { ok: true; workspace: Workspace; id: string } | { ok: false; reason: string };
 
 export type DeleteResult =
-    | { ok: true; workspace: Workspace; removedIds: string[] }
-    | { ok: false; reason: string };
+    { ok: true; workspace: Workspace; removedIds: string[] } | { ok: false; reason: string };
 
 function cleanName(name: string, fallback: string): string {
     return name.trim() || fallback;
@@ -246,9 +244,7 @@ function validateParent(
     }
 
     if (parentId === null) {
-        return kind === 'folder'
-            ? 'Folders must live inside a collection.'
-            : undefined;
+        return kind === 'folder' ? 'Folders must live inside a collection.' : undefined;
     }
 
     return getGroup(workspace, parentId)

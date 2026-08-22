@@ -27,8 +27,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const reveal = async (id: string, options?: { expand?: boolean }) => {
         try {
             await treeView.reveal(id, { select: true, focus: false, expand: options?.expand });
-        } catch {
-        }
+        } catch {}
     };
 
     const openRequest = async (id: string) => {

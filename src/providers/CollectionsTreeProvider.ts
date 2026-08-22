@@ -64,10 +64,7 @@ export class CollectionsTreeProvider
         }
 
         if (isGroup(node)) {
-            const item = new vscode.TreeItem(
-                node.name,
-                vscode.TreeItemCollapsibleState.Collapsed
-            );
+            const item = new vscode.TreeItem(node.name, vscode.TreeItemCollapsibleState.Collapsed);
 
             item.id = node.id;
             item.contextValue = node.kind;

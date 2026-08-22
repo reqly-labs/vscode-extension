@@ -38,7 +38,11 @@ function assertInvariants(workspace: Workspace, context: string): void {
     const allIds = Object.keys(workspace.nodes);
     const orphans = allIds.filter((id) => !seen.has(id));
 
-    assert.deepEqual(orphans, [], `${context}: ${orphans.length} node(s) unreachable from the root`);
+    assert.deepEqual(
+        orphans,
+        [],
+        `${context}: ${orphans.length} node(s) unreachable from the root`
+    );
 }
 
 function makeRandom(seed: number): () => number {
