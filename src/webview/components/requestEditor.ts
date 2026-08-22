@@ -10,7 +10,6 @@ import { createFormDataEditor } from './formDataEditor';
 import { createKvEditor } from './kvEditor';
 import { createSelect } from './select';
 import { createTabs } from './tabs';
-
 const BODY_LABELS: Record<BodyType, string> = {
     none: 'None',
     json: 'JSON',
@@ -20,24 +19,24 @@ const BODY_LABELS: Record<BodyType, string> = {
     multipart: 'Form Data',
     binary: 'Binary File',
 };
-
-function activeCount(items: { key: string; enabled: boolean }[]): number {
+function activeCount(
+    items: {
+        key: string;
+        enabled: boolean;
+    }[]
+): number {
     return items.filter((item) => item.enabled && item.key.trim()).length;
 }
-
 export function createRequestEditor(): HTMLElement {
     const { snapshot } = state;
-
     const edited = () => {
         schedulePersist();
         refreshBadges();
     };
-
     const structural = () => {
         schedulePersist();
         refreshBadges();
     };
-
     const params = createKvEditor({
         items: snapshot.params,
         keyPlaceholder: 'Parameter',
@@ -45,7 +44,6 @@ export function createRequestEditor(): HTMLElement {
         onEdit: edited,
         onStructureChange: structural,
     });
-
     const headers = createKvEditor({
         items: snapshot.headers,
         keyPlaceholder: 'Header',
@@ -53,7 +51,6 @@ export function createRequestEditor(): HTMLElement {
         onEdit: edited,
         onStructureChange: structural,
     });
-
     const auth = createAuthEditor({
         getAuth: () => snapshot.auth,
         setAuth: (next) => {
@@ -64,9 +61,7 @@ export function createRequestEditor(): HTMLElement {
             tabs.setDot('auth', snapshot.auth.type !== 'none');
         },
     });
-
     const bodyPane = el('div', { class: 'body-pane' });
-
     const bodySelect = createSelect<BodyType>({
         value: snapshot.bodyType,
         ariaLabel: 'Body type',
@@ -79,14 +74,12 @@ export function createRequestEditor(): HTMLElement {
             tabs.setDot('body', type !== 'none');
         },
     });
-
     const bodyTab = el(
         'div',
         { class: 'pane body-tab' },
         el('div', { class: 'body-toolbar' }, bodySelect.root, buildBodyActions()),
         bodyPane
     );
-
     function buildBodyActions(): HTMLElement {
         const beautify = el(
             'button',
@@ -98,7 +91,6 @@ export function createRequestEditor(): HTMLElement {
                         if (snapshot.bodyType !== 'json') {
                             return;
                         }
-
                         try {
                             snapshot.body = JSON.stringify(JSON.parse(snapshot.body), null, 2);
                             renderBody();
@@ -116,27 +108,21 @@ export function createRequestEditor(): HTMLElement {
             icon('zap'),
             'Beautify'
         );
-
         const actions = el('div', { class: 'body-actions' }, beautify);
-
         const sync = () => {
             beautify.classList.toggle('is-hidden', snapshot.bodyType !== 'json');
         };
-
         sync();
         on('body', sync);
-
         return actions;
     }
-
-    let activeFormDataEditor: { destroy(): void } | null = null;
-
+    let activeFormDataEditor: {
+        destroy(): void;
+    } | null = null;
     function renderBody(): void {
         activeFormDataEditor?.destroy();
         activeFormDataEditor = null;
-
         const type = snapshot.bodyType;
-
         if (type === 'none') {
             replace(
                 bodyPane,
@@ -144,7 +130,6 @@ export function createRequestEditor(): HTMLElement {
             );
             return;
         }
-
         if (type === 'json' || type === 'xml' || type === 'text') {
             const editor = createEditor({
                 value: snapshot.body,
@@ -155,11 +140,9 @@ export function createRequestEditor(): HTMLElement {
                     edited();
                 },
             });
-
             replace(bodyPane, editor.root);
             return;
         }
-
         if (type === 'form') {
             const editor = createKvEditor({
                 items: snapshot.formBody,
@@ -167,31 +150,25 @@ export function createRequestEditor(): HTMLElement {
                 onEdit: edited,
                 onStructureChange: structural,
             });
-
             replace(bodyPane, editor.root);
             return;
         }
-
         if (type === 'multipart') {
             const editor = createFormDataEditor({
                 items: snapshot.multipartBody,
                 onEdit: edited,
                 onStructureChange: structural,
             });
-
             activeFormDataEditor = editor;
             replace(bodyPane, editor.root);
             return;
         }
-
         replace(bodyPane, buildBinaryPicker());
     }
-
     function buildBinaryPicker(): HTMLElement {
         const name = snapshot.binaryPath
             ? snapshot.binaryPath.split(/[\\/]/).pop()
             : 'Choose a file…';
-
         return el(
             'div',
             { class: 'binary-picker' },
@@ -216,16 +193,13 @@ export function createRequestEditor(): HTMLElement {
                   })
         );
     }
-
     const panes: Record<string, HTMLElement> = {
         params: el('div', { class: 'pane' }, params.root),
         headers: el('div', { class: 'pane' }, headers.root),
         body: bodyTab,
         auth: el('div', { class: 'pane' }, auth.root),
     };
-
     const content = el('div', { class: 'pane-host' });
-
     const tabs = createTabs({
         items: [
             { id: 'params', label: 'Params' },
@@ -240,51 +214,41 @@ export function createRequestEditor(): HTMLElement {
             schedulePersist();
         },
     });
-
     function showPane(id: string): void {
         replace(content, panes[id] ?? panes.params);
     }
-
     function refreshBadges(): void {
         const paramCount = activeCount(snapshot.params);
         const headerCount = activeCount(snapshot.headers);
-
         tabs.setBadge('params', paramCount > 0 ? String(paramCount) : null);
         tabs.setBadge('headers', headerCount > 0 ? String(headerCount) : null);
         tabs.setDot('body', snapshot.bodyType !== 'none');
         tabs.setDot('auth', snapshot.auth.type !== 'none');
     }
-
     on('params', () => {
         params.refresh();
         refreshBadges();
     });
-
     on('headers', () => {
         headers.refresh();
         refreshBadges();
     });
-
     on('auth', () => {
         auth.refresh();
         refreshBadges();
     });
-
     on('body', () => {
         bodySelect.setValue(snapshot.bodyType);
         renderBody();
         refreshBadges();
     });
-
     on('requestTab', () => {
         tabs.setActive(state.activeRequestTab);
         showPane(state.activeRequestTab);
     });
-
     renderBody();
     refreshBadges();
     showPane(state.activeRequestTab);
-
     return el(
         'section',
         { class: 'panel request-panel' },

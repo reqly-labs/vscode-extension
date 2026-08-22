@@ -1,21 +1,14 @@
 import { createThemeCss, dark, light } from '@reqly/design-system';
-
-/**
- * Both palettes ship up front and are switched by a class on `<html>`, so
- * following the editor's theme costs nothing at runtime.
- */
 const THEME_CSS = createThemeCss(light, dark, {
     lightSelector: ':root',
     darkSelector: ':root.reqly-dark',
 });
-
 export interface CollectionsPageOptions {
     scriptUri: string;
     styleUri: string;
     cspSource: string;
     nonce: string;
 }
-
 export function renderCollectionsPage({
     scriptUri,
     styleUri,
@@ -29,7 +22,6 @@ export function renderCollectionsPage({
         `script-src 'nonce-${nonce}'`,
         `font-src ${cspSource}`,
     ].join('; ');
-
     return `<!DOCTYPE html>
 <html lang="en">
 <head>

@@ -1,36 +1,29 @@
 import { el, replace } from '../dom';
 import { icon } from '../icons';
-
 export interface SelectOption<T extends string> {
     value: T;
     label: string;
     className?: string;
 }
-
 export interface SelectHandle<T extends string> {
     root: HTMLElement;
     setValue(value: T): void;
     destroy(): void;
 }
-
 let openPopup: (() => void) | null = null;
-
 function isInsideSelect(target: EventTarget | null): boolean {
     return Boolean((target as HTMLElement | null)?.closest('.select, .select-popup'));
 }
-
 document.addEventListener('mousedown', (event) => {
     if (!isInsideSelect(event.target)) {
         openPopup?.();
     }
 });
-
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
         openPopup?.();
     }
 });
-
 document.addEventListener(
     'scroll',
     () => {
@@ -38,27 +31,21 @@ document.addEventListener(
     },
     true
 );
-
 window.addEventListener('resize', () => {
     openPopup?.();
 });
-
 function positionPopup(popup: HTMLElement, trigger: HTMLElement): void {
     const rect = trigger.getBoundingClientRect();
-
     popup.style.minWidth = `${rect.width}px`;
     popup.style.top = `${rect.bottom + 4}px`;
     popup.style.left = `${rect.left}px`;
-
     requestAnimationFrame(() => {
         const overflow = rect.left + popup.offsetWidth - window.innerWidth + 8;
-
         if (overflow > 0) {
             popup.style.left = `${Math.max(8, rect.left - overflow)}px`;
         }
     });
 }
-
 export function createSelect<T extends string>(options: {
     value: T;
     items: SelectOption<T>[];
@@ -68,13 +55,10 @@ export function createSelect<T extends string>(options: {
 }): SelectHandle<T> {
     let current = options.value;
     const extraClass = options.className ?? '';
-
     const label = el('span', { class: 'select-label' });
     const list = el('div', { class: 'select-list', role: 'listbox' });
-
     const popup = el('div', { class: `select-popup ${extraClass}`.trim() }, list);
     document.body.appendChild(popup);
-
     const trigger = el(
         'button',
         {
@@ -86,34 +70,27 @@ export function createSelect<T extends string>(options: {
         label,
         icon('chevronDown', 'select-caret')
     );
-
     const root = el('div', { class: `select ${extraClass}`.trim() }, trigger);
-
     const paint = () => {
         const item = options.items.find((entry) => entry.value === current);
         replace(label, el('span', { class: item?.className ?? '', text: item?.label ?? current }));
-
         list.querySelectorAll('.select-item').forEach((node) => {
             node.classList.toggle('is-selected', (node as HTMLElement).dataset.value === current);
         });
     };
-
     const close = () => {
         root.classList.remove('is-open');
         popup.classList.remove('is-open');
         trigger.setAttribute('aria-expanded', 'false');
-
         if (openPopup === close) {
             openPopup = null;
         }
     };
-
     const toggle = () => {
         if (popup.classList.contains('is-open')) {
             close();
             return;
         }
-
         openPopup?.();
         positionPopup(popup, trigger);
         root.classList.add('is-open');
@@ -121,7 +98,6 @@ export function createSelect<T extends string>(options: {
         trigger.setAttribute('aria-expanded', 'true');
         openPopup = close;
     };
-
     for (const item of options.items) {
         list.appendChild(
             el(
@@ -134,7 +110,6 @@ export function createSelect<T extends string>(options: {
                     on: {
                         click: () => {
                             close();
-
                             if (item.value !== current) {
                                 current = item.value;
                                 paint();
@@ -147,9 +122,7 @@ export function createSelect<T extends string>(options: {
             )
         );
     }
-
     paint();
-
     return {
         root,
         setValue(value: T) {

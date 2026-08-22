@@ -1,7 +1,6 @@
 import type { ActiveRequestInfo, WebviewState } from '../core/messages';
 import { createSettings, createSnapshot } from '../core/types';
 import type { HttpResponse, RequestError } from '../core/types';
-
 export interface AppState extends WebviewState {
     loading: boolean;
     response: HttpResponse | null;
@@ -12,7 +11,6 @@ export interface AppState extends WebviewState {
     active: ActiveRequestInfo;
     baseline: string;
 }
-
 export type Channel =
     | 'method'
     | 'url'
@@ -25,11 +23,8 @@ export type Channel =
     | 'response'
     | 'responseTab'
     | 'active';
-
 type Listener = () => void;
-
 const listeners = new Map<Channel, Set<Listener>>();
-
 export const state: AppState = {
     snapshot: createSnapshot(),
     settings: createSettings(),
@@ -45,11 +40,9 @@ export const state: AppState = {
     active: { id: null, name: '', location: '' },
     baseline: '',
 };
-
 export function fingerprint(): string {
     return JSON.stringify(state.snapshot);
 }
-
 export function setActive(info: ActiveRequestInfo | undefined): void {
     state.active = {
         id: info?.id ?? null,
@@ -57,15 +50,12 @@ export function setActive(info: ActiveRequestInfo | undefined): void {
         location: info?.location ?? '',
     };
 }
-
 export function markSaved(): void {
     state.baseline = fingerprint();
 }
-
 export function isDirty(): boolean {
     return state.baseline !== fingerprint();
 }
-
 export function hydrate(next: WebviewState): void {
     state.snapshot = { ...createSnapshot(), ...next.snapshot };
     state.settings = { ...createSettings(), ...next.settings };
@@ -74,19 +64,16 @@ export function hydrate(next: WebviewState): void {
     state.activeRequestId = next.activeRequestId ?? null;
     markSaved();
 }
-
 export function on(channel: Channel, listener: Listener): void {
     const set = listeners.get(channel) ?? new Set();
     set.add(listener);
     listeners.set(channel, set);
 }
-
 export function emit(...channels: Channel[]): void {
     for (const channel of channels) {
         listeners.get(channel)?.forEach((listener) => listener());
     }
 }
-
 export function persistable(): WebviewState {
     return {
         snapshot: state.snapshot,

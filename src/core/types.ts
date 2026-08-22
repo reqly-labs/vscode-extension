@@ -1,46 +1,37 @@
 import { AUTH_TYPES, BODY_TYPES, DEFAULT_TIMEOUT_MS, HTTP_METHODS } from './constants';
-
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 export type BodyType = (typeof BODY_TYPES)[number];
 export type AuthType = (typeof AUTH_TYPES)[number];
-
 export interface KeyValue {
     id: string;
     key: string;
     value: string;
     enabled: boolean;
 }
-
 export interface FormField extends KeyValue {
     type: 'text' | 'file';
     filePath?: string;
 }
-
 export interface AuthNone {
     type: 'none';
 }
-
 export interface AuthBearer {
     type: 'bearer';
     token: string;
     prefix: string;
 }
-
 export interface AuthBasic {
     type: 'basic';
     username: string;
     password: string;
 }
-
 export interface AuthApiKey {
     type: 'api-key';
     key: string;
     value: string;
     addTo: 'header' | 'query';
 }
-
 export type Auth = AuthNone | AuthBearer | AuthBasic | AuthApiKey;
-
 export interface RequestSnapshot {
     method: HttpMethod;
     url: string;
@@ -53,13 +44,11 @@ export interface RequestSnapshot {
     binaryPath: string;
     auth: Auth;
 }
-
 export interface RequestSettings {
     timeout: number;
     followRedirects: boolean;
     rejectUnauthorized: boolean;
 }
-
 export interface ResponseTimings {
     dns: number;
     connect: number;
@@ -68,7 +57,6 @@ export interface ResponseTimings {
     download: number;
     total: number;
 }
-
 export interface HttpResponse {
     status: number;
     statusText: string;
@@ -84,24 +72,19 @@ export interface HttpResponse {
     redirects: string[];
     finalUrl: string;
 }
-
 export interface RequestError {
     message: string;
     detail?: string;
 }
-
 export function createId(): string {
     return Math.random().toString(36).slice(2, 10);
 }
-
 export function emptyKeyValue(): KeyValue {
     return { id: createId(), key: '', value: '', enabled: true };
 }
-
 export function emptyFormField(): FormField {
     return { id: createId(), key: '', value: '', enabled: true, type: 'text' };
 }
-
 export function createSnapshot(): RequestSnapshot {
     return {
         method: 'GET',
@@ -116,7 +99,6 @@ export function createSnapshot(): RequestSnapshot {
         auth: { type: 'none' },
     };
 }
-
 export function createSettings(): RequestSettings {
     return {
         timeout: DEFAULT_TIMEOUT_MS,

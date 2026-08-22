@@ -3,14 +3,12 @@ import type { Auth, AuthApiKey, AuthBasic, AuthBearer, AuthType } from '../../co
 import { el, replace } from '../dom';
 import { icon } from '../icons';
 import { createSelect, type SelectHandle } from './select';
-
 const AUTH_LABELS: Record<AuthType, string> = {
     none: 'No Auth',
     bearer: 'Bearer Token',
     basic: 'Basic Auth',
     'api-key': 'API Key',
 };
-
 function defaultAuth(type: AuthType): Auth {
     switch (type) {
         case 'bearer':
@@ -23,7 +21,6 @@ function defaultAuth(type: AuthType): Auth {
             return { type: 'none' };
     }
 }
-
 function field(label: string, control: HTMLElement): HTMLElement {
     return el(
         'label',
@@ -32,7 +29,6 @@ function field(label: string, control: HTMLElement): HTMLElement {
         control
     );
 }
-
 function textInput(
     value: string,
     placeholder: string,
@@ -46,7 +42,6 @@ function textInput(
         on: { input: (event) => onInput((event.target as HTMLInputElement).value) },
     });
 }
-
 function secretInput(
     value: string,
     placeholder: string,
@@ -60,7 +55,6 @@ function secretInput(
         spellcheck: false,
         on: { input: (event) => onInput((event.target as HTMLInputElement).value) },
     });
-
     const toggle = el(
         'button',
         {
@@ -77,10 +71,8 @@ function secretInput(
         },
         icon('eye')
     );
-
     return el('div', { class: 'secret-field' }, input, toggle);
 }
-
 function hint(...children: (string | Node)[]): HTMLElement {
     return el(
         'div',
@@ -89,20 +81,19 @@ function hint(...children: (string | Node)[]): HTMLElement {
         el('p', {}, ...(children as (string | Node)[]))
     );
 }
-
 function code(text: string): HTMLElement {
     return el('code', { text });
 }
-
 export function createAuthEditor(options: {
     getAuth: () => Auth;
     setAuth: (auth: Auth) => void;
     onEdit: () => void;
-}): { root: HTMLElement; refresh(): void } {
+}): {
+    root: HTMLElement;
+    refresh(): void;
+} {
     const body = el('div', { class: 'auth-body' });
-
     let addToSelect: SelectHandle<'header' | 'query'> | null = null;
-
     const select = createSelect<AuthType>({
         value: options.getAuth().type,
         ariaLabel: 'Authentication type',
@@ -113,17 +104,14 @@ export function createAuthEditor(options: {
             options.onEdit();
         },
     });
-
     const root = el(
         'div',
         { class: 'auth-editor' },
         el('div', { class: 'auth-head' }, select.root),
         body
     );
-
     function renderBearer(auth: AuthBearer): Node[] {
         const preview = code(`${auth.prefix || 'Bearer'} <token>`);
-
         return [
             field(
                 'Prefix',
@@ -143,7 +131,6 @@ export function createAuthEditor(options: {
             hint('Sent as ', preview, ' in the Authorization header.'),
         ];
     }
-
     function renderBasic(auth: AuthBasic): Node[] {
         return [
             field(
@@ -167,12 +154,10 @@ export function createAuthEditor(options: {
             ),
         ];
     }
-
     function renderApiKey(auth: AuthApiKey): Node[] {
         const target = el('span', {
             text: auth.addTo === 'header' ? 'request headers' : 'query parameters',
         });
-
         addToSelect = createSelect<'header' | 'query'>({
             value: auth.addTo,
             ariaLabel: 'Where to add the API key',
@@ -186,7 +171,6 @@ export function createAuthEditor(options: {
                 options.onEdit();
             },
         });
-
         return [
             field(
                 'Key',
@@ -206,14 +190,11 @@ export function createAuthEditor(options: {
             hint('The key-value pair is appended to the ', target, '.'),
         ];
     }
-
     function render(): void {
         const auth = options.getAuth();
         select.setValue(auth.type);
-
         addToSelect?.destroy();
         addToSelect = null;
-
         switch (auth.type) {
             case 'bearer':
                 replace(body, ...renderBearer(auth));
@@ -231,8 +212,6 @@ export function createAuthEditor(options: {
                 );
         }
     }
-
     render();
-
     return { root, refresh: render };
 }

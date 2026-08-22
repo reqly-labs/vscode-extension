@@ -3,7 +3,6 @@ import { schedulePersist } from '../bridge';
 import { el } from '../dom';
 import { icon } from '../icons';
 import { state } from '../store';
-
 function toggleRow(
     label: string,
     description: string,
@@ -28,10 +27,10 @@ function toggleRow(
         )
     );
 }
-
-export function createSettingsMenu(): { root: HTMLElement } {
+export function createSettingsMenu(): {
+    root: HTMLElement;
+} {
     const { settings } = state;
-
     const timeout = el('input', {
         class: 'field',
         type: 'number',
@@ -46,7 +45,6 @@ export function createSettingsMenu(): { root: HTMLElement } {
             },
         },
     });
-
     const panel = el(
         'div',
         { class: 'menu-popup settings-popup' },
@@ -81,7 +79,6 @@ export function createSettingsMenu(): { root: HTMLElement } {
             timeout
         )
     );
-
     const trigger = el(
         'button',
         {
@@ -98,14 +95,11 @@ export function createSettingsMenu(): { root: HTMLElement } {
         },
         icon('settings')
     );
-
     const root = el('div', { class: 'menu settings-menu' }, trigger, panel);
-
     document.addEventListener('mousedown', (event) => {
         if (!(event.target as HTMLElement | null)?.closest('.settings-menu')) {
             root.classList.remove('is-open');
         }
     });
-
     return { root };
 }

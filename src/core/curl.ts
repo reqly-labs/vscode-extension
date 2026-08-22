@@ -1,6 +1,5 @@
 import { HTTP_METHODS } from './constants';
 import { createId, type FormField, type HttpMethod, type RequestSnapshot } from './types';
-
 export interface ParsedCurl {
     method: HttpMethod;
     url: string;
@@ -8,20 +7,16 @@ export interface ParsedCurl {
     data?: string;
     multipartFields?: FormField[];
 }
-
 function tokenize(input: string): string[] {
     const normalized = input
         .replace(/\\\r?\n/g, ' ')
         .replace(/\^\r?\n/g, ' ')
         .trim();
     const tokens: string[] = [];
-
     let current = '';
     let quote: "'" | '"' | null = null;
-
     for (let i = 0; i < normalized.length; i += 1) {
         const ch = normalized[i];
-
         if (quote === "'") {
             if (ch === "'") {
                 quote = null;
@@ -30,32 +25,26 @@ function tokenize(input: string): string[] {
             }
             continue;
         }
-
         if (quote === '"') {
             if (ch === '"') {
                 quote = null;
                 continue;
             }
-
             if (ch === '\\' && i + 1 < normalized.length) {
                 const next = normalized[i + 1];
-
                 if (next === '"' || next === '\\') {
                     current += next;
                     i += 1;
                     continue;
                 }
             }
-
             current += ch;
             continue;
         }
-
         if (ch === "'" || ch === '"') {
             quote = ch;
             continue;
         }
-
         if (/\s/.test(ch)) {
             if (current) {
                 tokens.push(current);
@@ -63,62 +52,49 @@ function tokenize(input: string): string[] {
             }
             continue;
         }
-
         if (ch === '\\' && i + 1 < normalized.length) {
             current += normalized[i + 1];
             i += 1;
             continue;
         }
-
         current += ch;
     }
-
     if (current) {
         tokens.push(current);
     }
-
     return tokens;
 }
-
 function normalizeMethod(method: string): HttpMethod {
     const upper = method.toUpperCase();
     return HTTP_METHODS.includes(upper as HttpMethod) ? (upper as HttpMethod) : 'GET';
 }
-
-function parseHeader(raw: string): { key: string; value: string } | null {
+function parseHeader(raw: string): {
+    key: string;
+    value: string;
+} | null {
     const index = raw.indexOf(':');
-
     if (index <= 0) {
         return null;
     }
-
     return { key: raw.slice(0, index).trim(), value: raw.slice(index + 1).trim() };
 }
-
 export function parseCurlCommand(input: string): ParsedCurl | null {
     const trimmed = input.trim();
-
     if (!/^curl[\s\n]/i.test(trimmed)) {
         return null;
     }
-
     const tokens = tokenize(trimmed);
-
     if (tokens.length === 0 || tokens[0].toLowerCase() !== 'curl') {
         return null;
     }
-
     let method = '';
     let url = '';
     const headers: Record<string, string> = {};
     const dataParts: string[] = [];
     const formParts: string[] = [];
-
     const take = (index: number): string | null => tokens[index + 1] ?? null;
-
     for (let i = 1; i < tokens.length; i += 1) {
         const token = tokens[i];
-
         if (token === '-X' || token === '--request') {
             const value = take(i);
             if (value) {
@@ -127,17 +103,14 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
             }
             continue;
         }
-
         if (token.startsWith('-X') && token.length > 2) {
             method = token.slice(2);
             continue;
         }
-
         if (token.startsWith('--request=')) {
             method = token.slice('--request='.length);
             continue;
         }
-
         if (token === '-H' || token === '--header') {
             const value = take(i);
             if (value) {
@@ -149,7 +122,6 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
             }
             continue;
         }
-
         if (token.startsWith('-H') && token.length > 2) {
             const header = parseHeader(token.slice(2));
             if (header) {
@@ -157,7 +129,6 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
             }
             continue;
         }
-
         if (token === '-u' || token === '--user') {
             const value = take(i);
             if (value) {
@@ -166,7 +137,6 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
             }
             continue;
         }
-
         if (['-d', '--data', '--data-raw', '--data-binary', '--data-ascii'].includes(token)) {
             const value = take(i);
             if (value !== null) {
@@ -175,17 +145,14 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
             }
             continue;
         }
-
         if (token.startsWith('--data') && token.includes('=')) {
             dataParts.push(token.slice(token.indexOf('=') + 1));
             continue;
         }
-
         if (token.startsWith('-d') && token.length > 2) {
             dataParts.push(token.slice(2));
             continue;
         }
-
         if (token === '--url') {
             const value = take(i);
             if (value) {
@@ -194,12 +161,10 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
             }
             continue;
         }
-
         if (token.startsWith('--url=')) {
             url = token.slice('--url='.length);
             continue;
         }
-
         if (token === '-F' || token === '--form') {
             const value = take(i);
             if (value !== null) {
@@ -208,30 +173,24 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
             }
             continue;
         }
-
         if (token.startsWith('-F') && token.length > 2) {
             formParts.push(token.slice(2));
             continue;
         }
-
         if (token.startsWith('--form=')) {
             formParts.push(token.slice('--form='.length));
             continue;
         }
-
         if (!token.startsWith('-') && !url) {
             url = token;
         }
     }
-
     if (!url) {
         return null;
     }
-
     if (!method) {
         method = dataParts.length > 0 || formParts.length > 0 ? 'POST' : 'GET';
     }
-
     if (formParts.length > 0) {
         return {
             method: normalizeMethod(method),
@@ -239,14 +198,11 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
             headers,
             multipartFields: formParts.map((part) => {
                 const index = part.indexOf('=');
-
                 if (index <= 0) {
                     return { id: createId(), key: part, value: '', type: 'text', enabled: true };
                 }
-
                 const raw = part.slice(index + 1);
                 const isFile = raw.startsWith('@');
-
                 return {
                     id: createId(),
                     key: part.slice(0, index),
@@ -258,7 +214,6 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
             }),
         };
     }
-
     return {
         method: normalizeMethod(method),
         url,
@@ -266,52 +221,42 @@ export function parseCurlCommand(input: string): ParsedCurl | null {
         data: dataParts.length > 0 ? dataParts.join('&') : undefined,
     };
 }
-
 function toBase64(value: string): string {
     if (typeof btoa === 'function') {
         return btoa(value);
     }
-
     return Buffer.from(value, 'utf8').toString('base64');
 }
-
 function shellEscape(value: string): string {
     if (/^[a-zA-Z0-9._\-/:@=&?%+~#]+$/.test(value)) {
         return value;
     }
-
     return `'${value.replace(/'/g, `'\\''`)}'`;
 }
-
 export function buildCurlCommand(snapshot: RequestSnapshot): string {
     const lines: string[] = [];
     const head = snapshot.method === 'GET' ? ['curl'] : ['curl', '-X', snapshot.method];
-
     const url = new URL(
         /^[a-z][a-z0-9+.-]*:\/\//i.test(snapshot.url.trim())
             ? snapshot.url.trim()
             : `https://${snapshot.url.trim()}`
     );
-
     snapshot.params
         .filter((param) => param.enabled && param.key)
         .forEach((param) => url.searchParams.append(param.key, param.value));
-
     const { auth } = snapshot;
-
     if (auth.type === 'api-key' && auth.addTo === 'query' && auth.key) {
         url.searchParams.append(auth.key, auth.value);
     }
-
     head.push(shellEscape(url.toString()));
     lines.push(head.join(' '));
-
-    const headers: { key: string; value: string }[] = snapshot.headers
+    const headers: {
+        key: string;
+        value: string;
+    }[] = snapshot.headers
         .filter((header) => header.enabled && header.key)
         .map((header) => ({ key: header.key, value: header.value }));
-
     const hasHeader = (name: string) => headers.some((header) => header.key.toLowerCase() === name);
-
     if (auth.type === 'bearer' && auth.token) {
         headers.push({
             key: 'Authorization',
@@ -325,13 +270,10 @@ export function buildCurlCommand(snapshot: RequestSnapshot): string {
     } else if (auth.type === 'api-key' && auth.addTo === 'header' && auth.key) {
         headers.push({ key: auth.key, value: auth.value });
     }
-
     let data: string | undefined;
     const sendsBody = snapshot.method !== 'GET' && snapshot.method !== 'HEAD';
-
     if (sendsBody && (snapshot.bodyType === 'json' || snapshot.bodyType === 'xml')) {
         data = snapshot.body;
-
         if (!hasHeader('content-type')) {
             headers.push({
                 key: 'Content-Type',
@@ -340,7 +282,6 @@ export function buildCurlCommand(snapshot: RequestSnapshot): string {
         }
     } else if (sendsBody && snapshot.bodyType === 'text') {
         data = snapshot.body;
-
         if (!hasHeader('content-type')) {
             headers.push({ key: 'Content-Type', value: 'text/plain' });
         }
@@ -350,18 +291,14 @@ export function buildCurlCommand(snapshot: RequestSnapshot): string {
             .filter((field) => field.enabled && field.key)
             .forEach((field) => search.append(field.key, field.value));
         data = search.toString();
-
         if (!hasHeader('content-type')) {
             headers.push({ key: 'Content-Type', value: 'application/x-www-form-urlencoded' });
         }
     }
-
     headers.forEach((header) => lines.push(`-H ${shellEscape(`${header.key}: ${header.value}`)}`));
-
     if (data) {
         lines.push(`--data-raw ${shellEscape(data)}`);
     }
-
     if (sendsBody && snapshot.bodyType === 'multipart') {
         snapshot.multipartBody
             .filter((field) => field.enabled && field.key)
@@ -371,10 +308,8 @@ export function buildCurlCommand(snapshot: RequestSnapshot): string {
                 lines.push(`-F ${shellEscape(`${field.key}=${value}`)}`);
             });
     }
-
     if (sendsBody && snapshot.bodyType === 'binary' && snapshot.binaryPath) {
         lines.push(`--data-binary ${shellEscape(`@${snapshot.binaryPath}`)}`);
     }
-
     return lines.join(' \\\n  ');
 }

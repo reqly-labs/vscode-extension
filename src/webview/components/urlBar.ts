@@ -8,12 +8,9 @@ import { emit, on, state } from '../store';
 import { applyCurl } from '../curlImport';
 import { createSelect } from './select';
 import { createSettingsMenu } from './settingsMenu';
-
 export function createUrlBar(options: { onSend: () => void; onCancel: () => void }): HTMLElement {
     const { snapshot } = state;
-
     const shell = el('div', { class: `url-shell method-border-${snapshot.method.toLowerCase()}` });
-
     const methodSelect = createSelect<HttpMethod>({
         value: snapshot.method,
         ariaLabel: 'HTTP method',
@@ -29,7 +26,6 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
             schedulePersist();
         },
     });
-
     const urlInput = el('input', {
         class: 'url-input',
         value: snapshot.url,
@@ -49,7 +45,6 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
             },
             paste: (event) => {
                 const pasted = (event as ClipboardEvent).clipboardData?.getData('text');
-
                 if (pasted && applyCurl(pasted)) {
                     event.preventDefault();
                     urlInput.value = state.snapshot.url;
@@ -62,12 +57,9 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
             },
         },
     });
-
     shell.append(methodSelect.root, el('div', { class: 'url-divider' }), urlInput);
-
     const sendLabel = el('span', { text: 'Send' });
     const sendIcon = el('span', { class: 'send-icon' }, icon('send'));
-
     const sendButton = el(
         'button',
         {
@@ -80,10 +72,8 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
         sendIcon,
         sendLabel
     );
-
     const menu = createSendMenu();
     const settings = createSettingsMenu();
-
     const bar = el(
         'div',
         { class: 'url-bar' },
@@ -91,28 +81,24 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
         el('div', { class: 'send-group' }, sendButton, menu.root),
         settings.root
     );
-
     on('method', () => {
         methodSelect.setValue(state.snapshot.method);
         shell.className = `url-shell method-border-${state.snapshot.method.toLowerCase()}`;
     });
-
     on('url', () => {
         urlInput.value = state.snapshot.url;
     });
-
     on('response', () => {
         sendButton.classList.toggle('is-loading', state.loading);
         sendLabel.textContent = state.loading ? 'Cancel' : 'Send';
         replace(sendIcon, icon(state.loading ? 'stop' : 'send'));
     });
-
     return bar;
 }
-
-function createSendMenu(): { root: HTMLElement } {
+function createSendMenu(): {
+    root: HTMLElement;
+} {
     const list = el('div', { class: 'menu-list' });
-
     const trigger = el(
         'button',
         {
@@ -128,9 +114,7 @@ function createSendMenu(): { root: HTMLElement } {
         },
         icon('chevronDown')
     );
-
     const root = el('div', { class: 'menu' }, trigger, el('div', { class: 'menu-popup' }, list));
-
     const item = (name: 'copy' | 'terminal' | 'link', label: string, onClick: () => void) =>
         el(
             'button',
@@ -147,7 +131,6 @@ function createSendMenu(): { root: HTMLElement } {
             icon(name),
             label
         );
-
     list.append(
         item('copy', 'Copy URL', () => {
             if (state.snapshot.url.trim()) {
@@ -158,7 +141,6 @@ function createSendMenu(): { root: HTMLElement } {
             if (!state.snapshot.url.trim()) {
                 return;
             }
-
             try {
                 post({
                     type: 'copy',
@@ -170,12 +152,10 @@ function createSendMenu(): { root: HTMLElement } {
             }
         })
     );
-
     document.addEventListener('mousedown', (event) => {
         if (!(event.target as HTMLElement | null)?.closest('.menu')) {
             root.classList.remove('is-open');
         }
     });
-
     return { root };
 }

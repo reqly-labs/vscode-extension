@@ -2,20 +2,16 @@ import * as vscode from 'vscode';
 import { createThemeCss, dark, light } from '@reqly/design-system';
 import { APP_NAME } from '../brand';
 import { createNonce } from '../utils/nonce';
-
 const THEME_CSS = createThemeCss(light, dark, {
     lightSelector: ':root',
     darkSelector: ':root.reqly-dark',
 });
-
 export function renderPanelHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
     const asset = (...segments: string[]) =>
         webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...segments));
-
     const script = asset('dist', 'webview.js');
     const styles = asset('dist', 'webview.css');
     const token = createNonce();
-
     const csp = [
         `default-src 'none'`,
         `img-src ${webview.cspSource} data:`,
@@ -23,7 +19,6 @@ export function renderPanelHtml(webview: vscode.Webview, extensionUri: vscode.Ur
         `script-src 'nonce-${token}'`,
         `font-src ${webview.cspSource}`,
     ].join('; ');
-
     return `<!DOCTYPE html>
 <html lang="en">
 <head>

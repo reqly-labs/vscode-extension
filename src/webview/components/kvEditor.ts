@@ -1,12 +1,10 @@
 import { emptyKeyValue, type KeyValue } from '../../core/types';
 import { el, replace } from '../dom';
 import { icon, iconButton } from '../icons';
-
 export interface KvEditorHandle {
     root: HTMLElement;
     refresh(): void;
 }
-
 export function createKvEditor(options: {
     items: KeyValue[];
     onStructureChange: () => void;
@@ -16,7 +14,6 @@ export function createKvEditor(options: {
     emptyLabel?: string;
 }): KvEditorHandle {
     const rows = el('div', { class: 'kv-rows' });
-
     const addButton = el(
         'button',
         {
@@ -34,14 +31,12 @@ export function createKvEditor(options: {
         icon('plus'),
         'Add'
     );
-
     const root = el(
         'div',
         { class: 'kv-editor' },
         rows,
         el('div', { class: 'kv-actions' }, addButton)
     );
-
     function render(): void {
         if (options.items.length === 0) {
             replace(
@@ -50,10 +45,8 @@ export function createKvEditor(options: {
             );
             return;
         }
-
         replace(rows, ...options.items.map(buildRow));
     }
-
     function buildRow(item: KeyValue): HTMLElement {
         const toggle = el('input', {
             class: 'kv-check',
@@ -68,7 +61,6 @@ export function createKvEditor(options: {
                 },
             },
         });
-
         const keyInput = el('input', {
             class: 'field kv-key',
             value: item.key,
@@ -81,7 +73,6 @@ export function createKvEditor(options: {
                 },
             },
         });
-
         const valueInput = el('input', {
             class: 'field kv-value',
             value: item.value,
@@ -94,13 +85,11 @@ export function createKvEditor(options: {
                 },
             },
         });
-
         const remove = iconButton(
             'trash',
             'Remove entry',
             () => {
                 const index = options.items.indexOf(item);
-
                 if (index >= 0) {
                     options.items.splice(index, 1);
                     render();
@@ -109,7 +98,6 @@ export function createKvEditor(options: {
             },
             'is-danger'
         );
-
         const row = el(
             'div',
             { class: `kv-row${item.enabled ? '' : ' is-disabled'}` },
@@ -118,11 +106,8 @@ export function createKvEditor(options: {
             valueInput,
             remove
         );
-
         return row;
     }
-
     render();
-
     return { root, refresh: render };
 }

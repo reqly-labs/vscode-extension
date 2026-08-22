@@ -2,26 +2,20 @@ import { parseCurlCommand } from '../core/curl';
 import { formatJson, formatXml } from '../core/format';
 import { createId, emptyFormField, emptyKeyValue, type BodyType } from '../core/types';
 import { state } from './store';
-
 function inferBodyType(contentType: string, body: string): BodyType {
     const type = contentType.toLowerCase();
-
     if (type.includes('json')) {
         return 'json';
     }
-
     if (type.includes('xml')) {
         return 'xml';
     }
-
     if (type.includes('x-www-form-urlencoded')) {
         return 'form';
     }
-
     if (!body.trim()) {
         return 'none';
     }
-
     try {
         JSON.parse(body);
         return 'json';
@@ -29,24 +23,18 @@ function inferBodyType(contentType: string, body: string): BodyType {
         return 'text';
     }
 }
-
 function fill<T>(target: T[], next: T[]): void {
     target.splice(0, target.length, ...next);
 }
-
 export function applyCurl(text: string): boolean {
     const parsed = parseCurlCommand(text);
-
     if (!parsed) {
         return false;
     }
-
     const { snapshot } = state;
-
     snapshot.method = parsed.method;
     snapshot.url = parsed.url;
     snapshot.auth = { type: 'none' };
-
     fill(
         snapshot.headers,
         Object.entries(parsed.headers).map(([key, value]) => ({
@@ -56,16 +44,12 @@ export function applyCurl(text: string): boolean {
             enabled: true,
         }))
     );
-
     if (snapshot.headers.length === 0) {
         snapshot.headers.push(emptyKeyValue());
     }
-
     fill(snapshot.params, [emptyKeyValue()]);
-
     try {
         const url = new URL(parsed.url);
-
         if (url.search) {
             fill(
                 snapshot.params,
@@ -76,18 +60,15 @@ export function applyCurl(text: string): boolean {
                     enabled: true,
                 }))
             );
-
             url.search = '';
             snapshot.url = url.toString();
         }
     } catch {}
-
     if (parsed.multipartFields) {
         snapshot.bodyType = 'multipart';
         snapshot.body = '';
         fill(snapshot.multipartBody, parsed.multipartFields);
         fill(snapshot.formBody, [emptyKeyValue()]);
-
         if (snapshot.multipartBody.length === 0) {
             snapshot.multipartBody.push(emptyFormField());
         }
@@ -96,12 +77,9 @@ export function applyCurl(text: string): boolean {
             Object.entries(parsed.headers).find(
                 ([key]) => key.toLowerCase() === 'content-type'
             )?.[1] ?? '';
-
         const body = parsed.data ?? '';
         const bodyType = inferBodyType(contentType, body);
-
         snapshot.bodyType = bodyType;
-
         if (bodyType === 'form') {
             snapshot.body = '';
         } else if (bodyType === 'json') {
@@ -112,7 +90,6 @@ export function applyCurl(text: string): boolean {
             snapshot.body = body;
         }
         fill(snapshot.multipartBody, [emptyFormField()]);
-
         if (bodyType === 'form' && body) {
             const search = new URLSearchParams(body);
             const fields = [...search].map(([key, value]) => ({
@@ -121,21 +98,16 @@ export function applyCurl(text: string): boolean {
                 value,
                 enabled: true,
             }));
-
             fill(snapshot.formBody, fields.length > 0 ? fields : [emptyKeyValue()]);
         } else {
             fill(snapshot.formBody, [emptyKeyValue()]);
         }
     }
-
     activateRelevantTab();
-
     return true;
 }
-
 function activateRelevantTab(): void {
     const { snapshot } = state;
-
     const hasParams = snapshot.params.some((param) => param.enabled && param.key.trim());
     const hasHeaders = snapshot.headers.some((header) => header.enabled && header.key.trim());
     const hasBody =
@@ -143,7 +115,6 @@ function activateRelevantTab(): void {
             ? snapshot.multipartBody.some((field) => field.enabled && field.key.trim())
             : snapshot.bodyType !== 'none';
     const hasAuth = snapshot.auth.type !== 'none';
-
     if (hasParams) {
         state.activeRequestTab = 'params';
     } else if (hasHeaders) {
