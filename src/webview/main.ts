@@ -3,11 +3,12 @@ import './styles.css';
 import type { HostMessage } from '../core/messages';
 import { flushPersist, post } from './bridge';
 import { createRequestEditor } from './components/requestEditor';
+import { createRequestHeader, requestSave } from './components/requestHeader';
 import { createResponseView } from './components/responseView';
 import { createSplitView } from './components/splitView';
 import { createUrlBar } from './components/urlBar';
 import { el, replace } from './dom';
-import { emit, hydrate, state } from './store';
+import { emit, hydrate, markSaved, setActive, state } from './store';
 
 const root = document.getElementById('root') as HTMLElement;
 
@@ -70,11 +71,16 @@ function buildTopBar(mascotUri: string): HTMLElement {
 }
 
 function mount(mascotUri: string): void {
+    const header = createRequestHeader({ onSave: requestSave });
     const urlBar = createUrlBar({ onSend: send, onCancel: cancel });
     const split = createSplitView(createRequestEditor(), createResponseView());
 
-    replace(root, buildTopBar(mascotUri), urlBar, split);
-    emit('response');
+    replace(root, buildTopBar(mascotUri), header, urlBar, split);
+    emit('response', 'active');
+}
+
+function remountRequest(): void {
+    emit('method', 'url', 'params', 'headers', 'body', 'auth', 'requestTab', 'active');
 }
 
 window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
@@ -83,12 +89,34 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
     switch (message.type) {
         case 'init':
             hydrate(message.state);
+            setActive(message.active);
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
             mount(message.mascotUri);
             break;
 
         case 'theme':
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
+            break;
+
+        case 'loadRequest':
+            hydrate(message.state);
+            setActive(message.active);
+            state.response = null;
+            state.error = null;
+            state.loading = false;
+            remountRequest();
+            emit('response');
+            break;
+
+        case 'activeChanged':
+            setActive(message.active);
+            emit('active');
+            break;
+
+        case 'saved':
+            setActive(message.active);
+            markSaved();
+            emit('active');
             break;
 
         case 'response':
@@ -116,6 +144,8 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
         case 'command':
             if (message.name === 'send') {
                 send();
+            } else if (message.name === 'save') {
+                requestSave();
             } else {
                 cancel();
             }
@@ -141,11 +171,17 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
 });
 
 window.addEventListener('keydown', (event) => {
-    const sendCombo = (event.ctrlKey || event.metaKey) && event.key === 'Enter';
+    const modifier = event.ctrlKey || event.metaKey;
 
-    if (sendCombo) {
+    if (modifier && event.key === 'Enter') {
         event.preventDefault();
         send();
+        return;
+    }
+
+    if (modifier && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        requestSave();
     }
 });
 

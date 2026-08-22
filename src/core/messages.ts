@@ -5,22 +5,39 @@ export interface WebviewState {
     settings: RequestSettings;
     activeRequestTab: string;
     activeResponseTab: string;
+    activeRequestId: string | null;
+}
+
+export interface ActiveRequestInfo {
+    id: string | null;
+    name: string;
+    location: string;
 }
 
 export type HostMessage =
-    | { type: 'init'; state: WebviewState; mascotUri: string; theme: 'light' | 'dark' }
+    | {
+          type: 'init';
+          state: WebviewState;
+          mascotUri: string;
+          theme: 'light' | 'dark';
+          active: ActiveRequestInfo;
+      }
     | { type: 'theme'; theme: 'light' | 'dark' }
-    | { type: 'sending' }
+    | { type: 'loadRequest'; state: WebviewState; active: ActiveRequestInfo }
+    | { type: 'activeChanged'; active: ActiveRequestInfo }
+    | { type: 'saved'; active: ActiveRequestInfo }
     | { type: 'response'; requestId: number; response: HttpResponse }
     | { type: 'error'; requestId: number; error: RequestError }
     | { type: 'filePicked'; target: 'multipart' | 'binary'; fieldId: string; path: string }
-    | { type: 'command'; name: 'send' | 'cancel' };
+    | { type: 'command'; name: 'send' | 'cancel' | 'save' };
 
 export type PanelMessage =
     | { type: 'ready' }
     | { type: 'send'; requestId: number; snapshot: RequestSnapshot; settings: RequestSettings }
     | { type: 'cancel' }
     | { type: 'persist'; state: WebviewState }
+    | { type: 'save'; snapshot: RequestSnapshot }
+    | { type: 'saveAs'; snapshot: RequestSnapshot }
     | { type: 'copy'; text: string; label: string }
     | { type: 'pickFile'; target: 'multipart' | 'binary'; fieldId: string }
     | { type: 'saveResponse'; fileName: string }

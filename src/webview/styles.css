@@ -61,6 +61,57 @@ body {
     flex-shrink: 0;
 }
 
+.request-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+    min-height: 24px;
+}
+
+.request-identity {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    min-width: 0;
+}
+
+.request-dot {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    align-self: center;
+    border-radius: var(--radius-full);
+    background: var(--color-warning);
+}
+
+.request-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.request-title.is-unsaved {
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+.request-trail {
+    font-size: 11px;
+    color: var(--color-text-subtle);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.request-save {
+    flex-shrink: 0;
+}
+
 .brand {
     display: flex;
     align-items: center;

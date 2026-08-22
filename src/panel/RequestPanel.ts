@@ -1,12 +1,21 @@
 import * as vscode from 'vscode';
 import { APP_NAME } from '../brand';
-import type { HostMessage, PanelMessage } from '../core/messages';
-import { createSettings, createSnapshot } from '../core/types';
+import { pickContainer } from '../commands/collections';
+import type { ActiveRequestInfo, HostMessage, PanelMessage, WebviewState } from '../core/messages';
+import { createSettings, createSnapshot, type RequestSnapshot } from '../core/types';
+import { ancestorsOf, getRequest, requestLabel } from '../core/workspace';
 import { BuildError, buildRequest } from '../http/buildRequest';
 import { decodeResponse } from '../http/decodeResponse';
 import { executeRequest, TransportError } from '../http/executeRequest';
 import type { RequestStateService } from '../services/RequestStateService';
+import type { WorkspaceService } from '../services/WorkspaceService';
 import { renderPanelHtml } from './html';
+
+export interface PanelDependencies {
+    store: RequestStateService;
+    workspaceService: WorkspaceService;
+    onActiveChanged?: () => void;
+}
 
 export class RequestPanel {
     public static readonly viewType = 'reqly.requestPanel';
@@ -19,27 +28,45 @@ export class RequestPanel {
     private lastBody: Buffer | undefined;
 
     private ready = false;
-    private pending: 'send' | undefined;
+    private pending: 'send' | 'save' | undefined;
+
+    private activeRequestId: string | null = null;
 
     private constructor(
         private readonly panel: vscode.WebviewPanel,
         private readonly extensionUri: vscode.Uri,
-        private readonly store: RequestStateService
+        private readonly deps: PanelDependencies
     ) {
         this.panel.webview.html = renderPanelHtml(this.panel.webview, this.extensionUri);
         this.panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'mascot.png');
+
+        this.activeRequestId = this.validLink(this.store.read().activeRequestId);
 
         this.disposables.push(
             this.panel.webview.onDidReceiveMessage((message: PanelMessage) => this.handle(message)),
             vscode.window.onDidChangeActiveColorTheme(() =>
                 this.send({ type: 'theme', theme: this.themeKind() })
-            )
+            ),
+            this.deps.workspaceService.onDidChange(({ removedIds }) => {
+                if (this.activeRequestId && removedIds.includes(this.activeRequestId)) {
+                    this.activeRequestId = null;
+                    void this.persistLink();
+                }
+
+                if (this.ready) {
+                    this.send({ type: 'activeChanged', active: this.describeActive() });
+                }
+            })
         );
 
         this.panel.onDidDispose(() => this.dispose());
     }
 
-    static show(context: vscode.ExtensionContext, store: RequestStateService): RequestPanel {
+    private get store(): RequestStateService {
+        return this.deps.store;
+    }
+
+    static show(context: vscode.ExtensionContext, deps: PanelDependencies): RequestPanel {
         const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
 
         if (RequestPanel.current) {
@@ -56,17 +83,52 @@ export class RequestPanel {
             ],
         });
 
-        RequestPanel.current = new RequestPanel(panel, context.extensionUri, store);
+        RequestPanel.current = new RequestPanel(panel, context.extensionUri, deps);
 
         return RequestPanel.current;
     }
 
+    static get activeId(): string | null {
+        return RequestPanel.current?.activeRequestId ?? null;
+    }
+
+    async openRequest(id: string): Promise<void> {
+        const node = getRequest(this.deps.workspaceService.workspace, id);
+
+        if (!node) {
+            void vscode.window.showWarningMessage('That request no longer exists.');
+            return;
+        }
+
+        this.activeRequestId = id;
+        this.deps.onActiveChanged?.();
+
+        const state: WebviewState = {
+            ...this.store.read(),
+            snapshot: structuredClone(node.snapshot),
+            activeRequestId: id,
+        };
+
+        await this.store.write(state);
+        this.panel.reveal(this.panel.viewColumn, true);
+
+        if (!this.ready) {
+            return;
+        }
+
+        this.send({ type: 'loadRequest', state, active: this.describeActive() });
+    }
+
     async reset(): Promise<void> {
+        this.activeRequestId = null;
+        this.deps.onActiveChanged?.();
+
         await this.store.write({
             snapshot: createSnapshot(),
             settings: createSettings(),
             activeRequestTab: 'params',
             activeResponseTab: 'body',
+            activeRequestId: null,
         });
 
         if (!this.ready) {
@@ -89,6 +151,46 @@ export class RequestPanel {
         this.send({ type: 'command', name: 'send' });
     }
 
+    triggerSave(): void {
+        this.panel.reveal(this.panel.viewColumn);
+
+        if (!this.ready) {
+            this.pending = 'save';
+            return;
+        }
+
+        this.send({ type: 'command', name: 'save' });
+    }
+
+    private validLink(id: string | null): string | null {
+        if (!id) {
+            return null;
+        }
+
+        return getRequest(this.deps.workspaceService.workspace, id) ? id : null;
+    }
+
+    private describeActive(): ActiveRequestInfo {
+        const { workspace } = this.deps.workspaceService;
+        const node = this.activeRequestId ? getRequest(workspace, this.activeRequestId) : undefined;
+
+        if (!node) {
+            return { id: null, name: '', location: '' };
+        }
+
+        return {
+            id: node.id,
+            name: requestLabel(node),
+            location: ancestorsOf(workspace, node.id)
+                .map((group) => group.name)
+                .join(' / '),
+        };
+    }
+
+    private async persistLink(): Promise<void> {
+        await this.store.write({ ...this.store.read(), activeRequestId: this.activeRequestId });
+    }
+
     private themeKind(): 'light' | 'dark' {
         const { kind } = vscode.window.activeColorTheme;
 
@@ -109,8 +211,9 @@ export class RequestPanel {
 
                 this.send({
                     type: 'init',
-                    state: this.store.read(),
+                    state: { ...this.store.read(), activeRequestId: this.activeRequestId },
                     theme: this.themeKind(),
+                    active: this.describeActive(),
                     mascotUri: this.panel.webview
                         .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'mascot.png'))
                         .toString(),
@@ -123,7 +226,18 @@ export class RequestPanel {
                 break;
 
             case 'persist':
-                await this.store.write(message.state);
+                await this.store.write({
+                    ...message.state,
+                    activeRequestId: this.activeRequestId,
+                });
+                break;
+
+            case 'save':
+                await this.saveActive(message.snapshot);
+                break;
+
+            case 'saveAs':
+                await this.saveAs(message.snapshot);
                 break;
 
             case 'send':
@@ -156,6 +270,71 @@ export class RequestPanel {
                 this.notify(message.level, message.text);
                 break;
         }
+    }
+
+    private async saveActive(snapshot: RequestSnapshot): Promise<void> {
+        if (!this.activeRequestId) {
+            await this.saveAs(snapshot);
+            return;
+        }
+
+        const result = await this.deps.workspaceService.updateSnapshot(
+            this.activeRequestId,
+            snapshot
+        );
+
+        if (!result.ok) {
+            this.activeRequestId = null;
+            void vscode.window.showWarningMessage(result.reason);
+            await this.saveAs(snapshot);
+            return;
+        }
+
+        this.send({ type: 'saved', active: this.describeActive() });
+        vscode.window.setStatusBarMessage('Request saved', 2000);
+    }
+
+    private async saveAs(snapshot: RequestSnapshot): Promise<void> {
+        const { workspaceService } = this.deps;
+
+        const parentId = await pickContainer(workspaceService.workspace, 'Save the request where?');
+
+        if (parentId === undefined) {
+            return;
+        }
+
+        const suggested = requestLabel({
+            id: '',
+            kind: 'request',
+            name: '',
+            snapshot,
+            createdAt: 0,
+            updatedAt: 0,
+        });
+
+        const name = await vscode.window.showInputBox({
+            prompt: 'Name for the request',
+            value: suggested,
+            validateInput: (input) => (input.trim() ? undefined : 'The name cannot be empty.'),
+        });
+
+        if (name === undefined) {
+            return;
+        }
+
+        const result = await workspaceService.createRequest(parentId, name, snapshot);
+
+        if (!result.ok) {
+            void vscode.window.showWarningMessage(result.reason);
+            return;
+        }
+
+        this.activeRequestId = result.id;
+        this.deps.onActiveChanged?.();
+        await this.persistLink();
+
+        this.send({ type: 'saved', active: this.describeActive() });
+        vscode.window.setStatusBarMessage(`Saved as "${name.trim()}"`, 2500);
     }
 
     private notify(level: 'info' | 'warn' | 'error', text: string): void {
@@ -246,6 +425,7 @@ export class RequestPanel {
 
     private dispose(): void {
         RequestPanel.current = undefined;
+        this.deps.onActiveChanged?.();
         this.inFlight?.abort();
         this.disposables.forEach((disposable) => disposable.dispose());
         this.panel.dispose();

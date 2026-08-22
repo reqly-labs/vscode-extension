@@ -59,6 +59,53 @@
                 "title": "Send Request",
                 "category": "Reqly",
                 "icon": "$(play)"
+            },
+            {
+                "command": "reqly.saveRequest",
+                "title": "Save Request",
+                "category": "Reqly",
+                "icon": "$(save)"
+            },
+            {
+                "command": "reqly.newCollection",
+                "title": "New Collection",
+                "category": "Reqly",
+                "icon": "$(new-folder)"
+            },
+            {
+                "command": "reqly.newFolder",
+                "title": "New Folder",
+                "category": "Reqly",
+                "icon": "$(new-folder)"
+            },
+            {
+                "command": "reqly.newRequestIn",
+                "title": "Add Request to Collection",
+                "category": "Reqly",
+                "icon": "$(add)"
+            },
+            {
+                "command": "reqly.renameNode",
+                "title": "Rename",
+                "category": "Reqly",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "reqly.duplicateNode",
+                "title": "Duplicate",
+                "category": "Reqly",
+                "icon": "$(files)"
+            },
+            {
+                "command": "reqly.deleteNode",
+                "title": "Delete",
+                "category": "Reqly",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "reqly.openRequest",
+                "title": "Open Request",
+                "category": "Reqly"
             }
         ],
         "viewsContainers": {
@@ -73,10 +120,90 @@
         "views": {
             "reqly": [
                 {
+                    "id": "reqly.collections",
+                    "name": "Collections",
+                    "icon": "media/reqly.svg"
+                },
+                {
                     "type": "webview",
                     "id": "reqly.sidebar",
-                    "name": "Reqly",
-                    "icon": "media/reqly.svg"
+                    "name": "About",
+                    "icon": "media/reqly.svg",
+                    "visibility": "collapsed"
+                }
+            ]
+        },
+        "viewsWelcome": [
+            {
+                "view": "reqly.collections",
+                "contents": "No collections yet.\n\nGroup related requests together, or keep working with a single loose request.\n\n[New Collection](command:reqly.newCollection)\n[New Request](command:reqly.newRequestIn)"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "reqly.newRequestIn",
+                    "when": "view == reqly.collections",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "reqly.newCollection",
+                    "when": "view == reqly.collections",
+                    "group": "navigation@2"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "reqly.newRequestIn",
+                    "when": "view == reqly.collections && viewItem =~ /^(collection|folder)$/",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "reqly.newRequestIn",
+                    "when": "view == reqly.collections && viewItem =~ /^(collection|folder)$/",
+                    "group": "1_new@1"
+                },
+                {
+                    "command": "reqly.newFolder",
+                    "when": "view == reqly.collections && viewItem =~ /^(collection|folder)$/",
+                    "group": "1_new@2"
+                },
+                {
+                    "command": "reqly.renameNode",
+                    "when": "view == reqly.collections",
+                    "group": "2_edit@1"
+                },
+                {
+                    "command": "reqly.duplicateNode",
+                    "when": "view == reqly.collections",
+                    "group": "2_edit@2"
+                },
+                {
+                    "command": "reqly.deleteNode",
+                    "when": "view == reqly.collections",
+                    "group": "3_destructive@1"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "reqly.openRequest",
+                    "when": "false"
+                },
+                {
+                    "command": "reqly.newFolder",
+                    "when": "false"
+                },
+                {
+                    "command": "reqly.renameNode",
+                    "when": "false"
+                },
+                {
+                    "command": "reqly.duplicateNode",
+                    "when": "false"
+                },
+                {
+                    "command": "reqly.deleteNode",
+                    "when": "false"
                 }
             ]
         },

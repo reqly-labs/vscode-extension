@@ -1,5 +1,5 @@
 import type { PanelMessage } from '../core/messages';
-import { persistable } from './store';
+import { emit, persistable } from './store';
 
 interface VsCodeApi {
     postMessage(message: PanelMessage): void;
@@ -18,6 +18,8 @@ export function post(message: PanelMessage): void {
 let persistTimer: number | undefined;
 
 export function schedulePersist(): void {
+    emit('active');
+
     window.clearTimeout(persistTimer);
     persistTimer = window.setTimeout(() => post({ type: 'persist', state: persistable() }), 300);
 }

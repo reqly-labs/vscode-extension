@@ -15,6 +15,8 @@ export class RequestStateService {
             settings: { ...createSettings(), ...stored?.settings },
             activeRequestTab: stored?.activeRequestTab ?? 'params',
             activeResponseTab: stored?.activeResponseTab ?? 'body',
+            activeRequestId:
+                typeof stored?.activeRequestId === 'string' ? stored.activeRequestId : null,
         };
     }
 
