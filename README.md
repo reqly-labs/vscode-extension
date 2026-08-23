@@ -30,6 +30,32 @@ away in the next, and nothing about your request ever leaves your machine.
 
 ## Features
 
+### Collections that keep their shape
+
+The Reqly panel in the Activity Bar holds your whole workspace: collections at the top level, folders
+nested inside them, and requests anywhere, including loose at the root when a collection would be
+overkill. Create, rename, duplicate, delete and reorder from a right-click menu or by dragging rows
+around. Renaming happens inline, on a double click or `F2`, the way the file explorer works.
+
+Everything is stored globally rather than per project, so your collections are there in every window
+and survive closing VS Code, updating the extension, and restarting the machine.
+
+The structure is normalized internally and every operation addresses a single node by its own id,
+never by a parent-plus-child pair. Moving a request while it is open cannot make a later save land on
+the wrong row, because nothing anywhere caches which collection a request belongs to. On load the
+stored tree is validated and, if it is ever inconsistent, repaired deterministically and reported
+rather than silently reshaped.
+
+### A request panel wired to your collections
+
+Clicking a request in the sidebar opens it in the panel and links the two. The header shows its name,
+the collection and folder it lives in, and a dot when there are unsaved edits. **Save** or `Ctrl+S`
+writes the changes back; an unlinked request offers **Save to…** and asks where it should live.
+
+Renaming, moving or deleting a request from the sidebar while it is open is handled live: the header
+follows the rename, and a delete simply unlinks the panel instead of leaving it pointing at something
+that no longer exists.
+
 ### A full request builder
 
 Pick any of the seven HTTP methods (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`), type
@@ -99,30 +125,48 @@ mid-flight with the same button that sent them.
 ### At home in your editor
 
 Every color comes from the [Reqly design system](https://github.com/reqly-labs/design-system) and
-follows your editor between light and dark themes, live, with no configuration. Your request survives
-a reload: method, URL, params, headers, body, auth and settings are all persisted per workspace.
+follows your editor between light and dark themes, live, with no configuration. Nothing is lost on a
+reload: collections follow you across every window, and the request you were editing, saved or not,
+comes back exactly as you left it in that workspace.
 
 ## Getting started
 
-1. Click the Reqly duck in the Activity Bar and choose **New Request**, or run **Reqly: Open HTTP
-   Client** from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
-2. Pick a method, type a URL, and press `Enter`.
+1. Click the Reqly duck in the Activity Bar.
+2. Hit **New Request** to start a loose request, or **New Collection** to group a few together.
+3. Name it inline, pick a method, type a URL, and press `Enter`.
+4. Press `Ctrl+S` to save your changes back to the request.
 
 ## Commands
 
-| Command                   | Description                                     |
-| ------------------------- | ----------------------------------------------- |
-| `Reqly: Open HTTP Client` | Opens the request panel in the editor area.     |
-| `Reqly: New Request`      | Clears the panel and starts from a blank slate. |
-| `Reqly: Send Request`     | Sends whatever the panel currently holds.       |
+| Command                   | Description                                                           |
+| ------------------------- | --------------------------------------------------------------------- |
+| `Reqly: New Request`      | Creates a request, opens it in the panel, and starts renaming it.     |
+| `Reqly: New Collection`   | Creates a collection and starts renaming it.                          |
+| `Reqly: Open HTTP Client` | Opens the request panel in the editor area.                           |
+| `Reqly: Send Request`     | Sends whatever the panel currently holds.                             |
+| `Reqly: Save Request`     | Writes the panel back to its saved request, asking where if unlinked. |
 
 ## Keyboard shortcuts
+
+In the request panel:
 
 | Shortcut                           | Action                          |
 | ---------------------------------- | ------------------------------- |
 | `Enter` in the URL field           | Send the request                |
 | `Ctrl+Enter` / `Cmd+Enter`         | Send from anywhere in the panel |
+| `Ctrl+S` / `Cmd+S`                 | Save the request                |
 | `Ctrl+Alt+Enter` / `Cmd+Alt+Enter` | Send from anywhere in VS Code   |
+
+In the collections sidebar:
+
+| Shortcut     | Action                            |
+| ------------ | --------------------------------- |
+| `↑` / `↓`    | Move the selection                |
+| `Enter`      | Open a request, or toggle a group |
+| `F2`         | Rename the selected item          |
+| `Delete`     | Delete the selected item          |
+| Double click | Rename inline                     |
+| Right click  | Open the context menu             |
 
 ## Built with
 
@@ -141,25 +185,36 @@ a reload: method, URL, params, headers, body, auth and settings are all persiste
 
 ## Architecture
 
-The extension ships two bundles that never import each other, only the pure modules between them:
+The extension ships three bundles that never import each other, only the pure modules between them:
 
 ```
 src/
-├── core/       → pure logic shared by both bundles (types, curl, formatting, message contracts)
-├── http/       → the transport: build a request, execute it, decode the response (Node only)
-├── panel/      → the request panel controller and its HTML shell
-├── providers/  → the Activity Bar webview view
-├── services/   → persisted state, backed by a workspace Memento
-├── utils/      → small shared helpers
-└── webview/    → the UI that runs inside the panel (DOM only, no VS Code API)
+├── core/         → pure logic shared by every bundle
+│                   (types, the collection tree, curl, formatting, message contracts)
+├── http/         → the transport: build a request, execute it, decode the response (Node only)
+├── panel/        → the request panel controller and its HTML shell
+├── providers/    → the collections sidebar controller and its HTML shell
+├── services/     → persisted state, backed by VS Code Mementos
+├── utils/        → small shared helpers
+├── collections/  → the UI that runs inside the sidebar (DOM only, no VS Code API)
+└── webview/      → the UI that runs inside the panel (DOM only, no VS Code API)
     └── components/
 ```
 
-`src/extension.ts` runs in the Node extension host and owns the network, the file system and the
-clipboard. `src/webview/main.ts` runs in the panel and owns the DOM. They never share objects, only
-the typed messages declared in `src/core/messages.ts`, which keeps the boundary explicit and both
-sides independently testable. Everything under `src/core` is free of both `vscode` and `document`,
-which is exactly why the test suite can exercise it directly.
+`src/extension.ts` runs in the Node extension host and owns the network, the file system, the
+clipboard and the collection tree. `src/webview/main.ts` and `src/collections/main.ts` run inside
+their webviews and own only the DOM. They never share objects, only the typed messages declared in
+`src/core/messages.ts` and `src/core/collectionsMessages.ts`, which keeps the boundary explicit and
+every side independently testable. Everything under `src/core` is free of both `vscode` and
+`document`, which is exactly why the test suite can exercise it directly.
+
+The collection tree deserves its own note. It lives in `src/core/workspace.ts` as a normalized map of
+nodes plus ordered `childIds`, with no stored parent pointers: a node's parent is always derived, so
+two sources of truth cannot disagree. Every mutation is a pure function taking a single node id and
+returning either a new tree or a reason it refused, which means an operation can never quietly land
+on the wrong row or silently do nothing. `WorkspaceService` is the only writer, and the sidebar
+webview receives a flat list of rows to draw rather than the tree itself, so it makes no structural
+decisions at all.
 
 ## Requirements
 
@@ -175,16 +230,21 @@ workspaces can disagree without fighting over a global setting.
 
 ## Known Issues
 
-- Only one request at a time: sending again replaces the request in flight.
+- One request open at a time: opening another replaces what the panel is showing, and sending again
+  replaces the request in flight.
+- Deleting is permanent. There is a confirmation prompt, but no undo afterwards.
+- Credentials saved inside a request are stored in plain text in VS Code's global state, the same as
+  in other local API clients. Treat a saved token the way you would treat one in a scratch file.
 - Responses over 5 MB are not previewed in the panel. Use **Save** to write them to disk.
-- No collections or request history yet. The panel remembers the current request per workspace.
+- No request history yet.
 - Proxy configuration is not read from VS Code settings yet.
 
 ## Roadmap
 
-- Collections, folders and request history, matching the Reqly web app.
-- Multiple request tabs.
+- Import and export, including Postman and Insomnia collections.
 - Environment variables and interpolation.
+- Multiple request tabs.
+- Request history.
 - `.http` and OpenAPI file import.
 - Proxy support driven by the editor's own settings.
 

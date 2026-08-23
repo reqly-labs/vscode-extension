@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-23
+
+Collections. Requests can now be grouped, named and kept, instead of the panel holding one throwaway
+request at a time.
+
+### Added
+
+- Collections sidebar in the Activity Bar, replacing the previous placeholder view: collections at
+  the top level, folders nested inside them, and requests either inside a group or loose at the root.
+- Create, rename, duplicate and delete collections, folders and requests, from a context menu, the
+  row actions, the view title bar, or the Command Palette.
+- Inline renaming on double click or `F2`, with `Escape` to cancel.
+- Drag and drop to move and reorder anything, with distinct drop indicators for landing inside a
+  group and landing beside a row.
+- Keyboard navigation in the sidebar: arrows to move, `Enter` to open or toggle, `F2` to rename,
+  `Delete` to remove.
+- Collections persisted in VS Code's global state, so they are present in every window and survive
+  restarts and extension updates.
+- Panel header showing the open request's name, the collection and folder it lives in, and an unsaved
+  changes indicator.
+- `Save` action and `Ctrl+S` in the panel to write edits back to the saved request, with a
+  `Save to…` flow that asks for a destination when the request is not linked yet.
+- `Reqly: New Collection` and `Reqly: Save Request` commands.
+- Welcome state with quick actions, and a footer showing collection and request counts alongside a
+  link to the GitHub organization.
+- Integrity check on load that repairs an inconsistent stored tree, reporting what it changed instead
+  of silently reshaping it.
+
+### Changed
+
+- `Reqly: New Request` now creates a real request in the tree and opens it, rather than clearing the
+  panel to a blank slate. Creating a request means the same thing everywhere it is offered.
+- The request panel no longer steals focus when a request is opened from the sidebar, so renaming
+  stays possible right after creating something.
+- Deleting asks for confirmation and, for a collection or folder, says how many items go with it.
+
+### Removed
+
+- The separate About view. Its actions now live in the collections sidebar, which is the only view in
+  the container.
+- The `Open HTTP Client` button in the sidebar. The panel opens on its own whenever a request is
+  opened or created; the command remains in the Command Palette.
+
 ## [1.0.0] - 2026-08-22
 
 First public release: a complete HTTP client inside VS Code, running over Node's own network stack so
@@ -42,5 +85,6 @@ that `localhost` services, self-signed certificates and arbitrary headers all wo
   editor themes.
 - `Ctrl+Alt+Enter` / `Cmd+Alt+Enter` keybinding to send the current request from anywhere in VS Code.
 
-[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.1.0
 [1.0.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.0.0

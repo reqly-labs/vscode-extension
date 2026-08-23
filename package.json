@@ -3,7 +3,7 @@
     "publisher": "arturbomtempo-dev",
     "displayName": "Reqly for VS Code",
     "description": "A modern, lightweight HTTP client that brings the Reqly experience directly into VS Code.",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "icon": "media/icon.png",
     "license": "MIT",
     "author": {
@@ -38,7 +38,8 @@
         "curl",
         "request",
         "endpoint",
-        "testing"
+        "testing",
+        "collections"
     ],
     "activationEvents": [],
     "main": "./dist/extension.js",

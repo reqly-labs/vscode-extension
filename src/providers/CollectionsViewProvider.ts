@@ -258,7 +258,7 @@ export class CollectionsViewProvider implements vscode.WebviewViewProvider {
         await this.revealForRename(result.id);
         await this.callbacks.openRequest(result.id);
     }
-    
+
     private async ensureVisible(): Promise<void> {
         if (this.view) {
             return;
