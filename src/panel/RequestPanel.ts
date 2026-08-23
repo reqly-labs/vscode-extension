@@ -52,20 +52,29 @@ export class RequestPanel {
     private get store(): RequestStateService {
         return this.deps.store;
     }
-    static show(context: vscode.ExtensionContext, deps: PanelDependencies): RequestPanel {
+    static show(
+        context: vscode.ExtensionContext,
+        deps: PanelDependencies,
+        options: { preserveFocus?: boolean } = {}
+    ): RequestPanel {
         const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
         if (RequestPanel.current) {
-            RequestPanel.current.panel.reveal(column);
+            RequestPanel.current.panel.reveal(column, options.preserveFocus);
             return RequestPanel.current;
         }
-        const panel = vscode.window.createWebviewPanel(RequestPanel.viewType, APP_NAME, column, {
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [
-                vscode.Uri.joinPath(context.extensionUri, 'dist'),
-                vscode.Uri.joinPath(context.extensionUri, 'media'),
-            ],
-        });
+        const panel = vscode.window.createWebviewPanel(
+            RequestPanel.viewType,
+            APP_NAME,
+            { viewColumn: column, preserveFocus: options.preserveFocus },
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: [
+                    vscode.Uri.joinPath(context.extensionUri, 'dist'),
+                    vscode.Uri.joinPath(context.extensionUri, 'media'),
+                ],
+            }
+        );
         RequestPanel.current = new RequestPanel(panel, context.extensionUri, deps);
         return RequestPanel.current;
     }

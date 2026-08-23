@@ -103,12 +103,21 @@ body {
 }
 
 .row.is-selected {
-    background: color-mix(in oklch, var(--color-primary) 14%, transparent);
+    background: var(--color-surface-hover);
 }
 
 .row.is-active {
-    background: color-mix(in oklch, var(--color-primary) 20%, transparent);
+    background: color-mix(in oklch, var(--color-primary) 7%, transparent);
     box-shadow: inset 2px 0 0 var(--color-primary);
+}
+
+.row.is-active .row-label {
+    color: var(--color-text);
+    font-weight: 500;
+}
+
+.row.is-active.is-selected {
+    background: color-mix(in oklch, var(--color-primary) 12%, transparent);
 }
 
 .row.is-drop-into {
@@ -334,14 +343,6 @@ body {
 .welcome-btn svg {
     width: 13px;
     height: 13px;
-}
-
-.welcome-tip {
-    margin: 10px 0 0;
-    font-size: 10.5px;
-    line-height: 1.55;
-    color: var(--color-text-subtle);
-    opacity: 0.85;
 }
 
 .footer {

@@ -242,9 +242,11 @@ export class CollectionsViewProvider implements vscode.WebviewViewProvider {
         }
     }
     async createCollection(): Promise<void> {
+        await this.ensureVisible();
         await this.create(() => this.workspaceService.createCollection('New Collection'));
     }
     async createRequest(parentId: ParentId): Promise<void> {
+        await this.ensureVisible();
         if (parentId) {
             this.expanded.add(parentId);
         }
@@ -255,6 +257,17 @@ export class CollectionsViewProvider implements vscode.WebviewViewProvider {
         }
         await this.revealForRename(result.id);
         await this.callbacks.openRequest(result.id);
+    }
+    
+    private async ensureVisible(): Promise<void> {
+        if (this.view) {
+            return;
+        }
+        try {
+            await vscode.commands.executeCommand(`${CollectionsViewProvider.viewType}.focus`);
+        } catch {
+            return;
+        }
     }
     private async create(
         run: () => Promise<{

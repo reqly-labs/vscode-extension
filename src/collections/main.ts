@@ -68,9 +68,7 @@ function buildWelcome(): HTMLElement {
     newCollection.appendChild(document.createTextNode('New Collection'));
     newCollection.addEventListener('click', () => post({ type: 'newCollection' }));
     actions.append(newRequest, newCollection);
-    const tip = el('p', 'welcome-tip');
-    tip.textContent = 'Tip: paste a cURL command into the URL bar to import it.';
-    welcome.append(heading, text, actions, tip);
+    welcome.append(heading, text, actions);
     return welcome;
 }
 function buildFooter(): HTMLElement {
@@ -195,7 +193,10 @@ function buildRow(row: TreeRow): HTMLElement {
     }
     actions.appendChild(iconButton('trash', 'Delete', () => post({ type: 'delete', id: row.id })));
     node.appendChild(actions);
-    node.addEventListener('click', () => {
+    node.addEventListener('click', (event) => {
+        if (editingId || event.detail > 1) {
+            return;
+        }
         selectedId = row.id;
         if (isGroup) {
             post({ type: 'toggle', id: row.id });
@@ -361,6 +362,9 @@ window.addEventListener('message', (event: MessageEvent<CollectionsHostMessage>)
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
             if (editingId && !rows.some((row) => row.id === editingId)) {
                 editingId = null;
+            }
+            if (editingId) {
+                break;
             }
             render();
             break;

@@ -12,7 +12,7 @@ export function activate(context: vscode.ExtensionContext): void {
         context.globalState,
         {
             openRequest: async (id) => {
-                await RequestPanel.show(context, deps).openRequest(id);
+                await RequestPanel.show(context, deps, { preserveFocus: true }).openRequest(id);
             },
             activeRequestId: () => RequestPanel.activeId,
         }
