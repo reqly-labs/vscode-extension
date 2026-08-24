@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="media/icon.png" width="120" height="120" alt="Reqly icon" />
+  <img src="media/mascot.png" width="120" height="120" alt="Reqly icon" />
 </p>
 
 <h1 align="center">Reqly</h1>
