@@ -82,6 +82,7 @@ export class RequestPanel {
         return RequestPanel.current?.activeRequestId ?? null;
     }
     async openRequest(id: string): Promise<void> {
+        await this.deps.workspaceService.restoreSecrets();
         const node = getRequest(this.deps.workspaceService.workspace, id);
         if (!node) {
             void vscode.window.showWarningMessage('That request no longer exists.');
@@ -138,7 +139,7 @@ export class RequestPanel {
         };
     }
     private async persistLink(): Promise<void> {
-        await this.store.write({ ...this.store.read(), activeRequestId: this.activeRequestId });
+        await this.store.setActiveRequestId(this.activeRequestId);
     }
     private themeKind(): 'light' | 'dark' {
         const { kind } = vscode.window.activeColorTheme;
@@ -156,7 +157,10 @@ export class RequestPanel {
                 this.ready = true;
                 this.send({
                     type: 'init',
-                    state: { ...this.store.read(), activeRequestId: this.activeRequestId },
+                    state: {
+                        ...(await this.store.readWithSecret()),
+                        activeRequestId: this.activeRequestId,
+                    },
                     theme: this.themeKind(),
                     active: this.describeActive(),
                     mascotUri: this.panel.webview

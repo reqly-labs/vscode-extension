@@ -1,6 +1,5 @@
+import { collectSecrets, redactWorkspace, restoreWorkspace } from '../core/secrets';
 import type { RequestSnapshot } from '../core/types';
-import { Emitter } from '../utils/Emitter';
-import { normalizeWorkspace } from '../core/workspaceIntegrity';
 import {
     createCollection,
     createFolder,
@@ -15,7 +14,12 @@ import {
     type Workspace,
     type WorkspaceResult,
 } from '../core/workspace';
+import { normalizeWorkspace } from '../core/workspaceIntegrity';
+import { Emitter } from '../utils/Emitter';
+import type { SecretStore } from './SecretStore';
+
 const STORAGE_KEY = 'reqly.workspace';
+
 export interface WorkspaceChange {
     removedIds: string[];
 }
@@ -25,13 +29,32 @@ export interface WorkspaceStorage {
 }
 export class WorkspaceService {
     private state: Workspace;
+    private restored: Promise<void> | undefined;
     private readonly changeEmitter = new Emitter<WorkspaceChange>();
     readonly onDidChange = this.changeEmitter.event;
     readonly loadRepairs: string[];
-    constructor(private readonly memento: WorkspaceStorage) {
+    constructor(
+        private readonly memento: WorkspaceStorage,
+        private readonly secrets?: SecretStore
+    ) {
         const { workspace, repairs } = normalizeWorkspace(memento.get(STORAGE_KEY));
         this.state = workspace;
         this.loadRepairs = repairs;
+    }
+    async restoreSecrets(): Promise<void> {
+        this.restored ??= this.loadSecrets();
+        await this.restored;
+    }
+    private async loadSecrets(): Promise<void> {
+        if (!this.secrets) {
+            return;
+        }
+        const legacy = collectSecrets(this.state);
+        const vault = await this.secrets.readWorkspace();
+        this.state = restoreWorkspace(this.state, { ...legacy, ...vault });
+        if (Object.keys(legacy).length > 0) {
+            await this.commit(this.state, []);
+        }
     }
     get workspace(): Workspace {
         return this.state;
@@ -80,7 +103,8 @@ export class WorkspaceService {
     }
     private async commit(next: Workspace, removedIds: string[]): Promise<void> {
         this.state = next;
-        await this.memento.update(STORAGE_KEY, next);
+        const vaulted = await this.secrets?.writeWorkspace(collectSecrets(next));
+        await this.memento.update(STORAGE_KEY, vaulted ? redactWorkspace(next) : next);
         this.changeEmitter.fire({ removedIds });
     }
     async clear(): Promise<void> {

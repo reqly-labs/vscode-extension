@@ -2,10 +2,12 @@ import * as vscode from 'vscode';
 import { RequestPanel, type PanelDependencies } from './panel/RequestPanel';
 import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
 import { RequestStateService } from './services/RequestStateService';
+import { SecretStore } from './services/SecretStore';
 import { WorkspaceService } from './services/WorkspaceService';
 export function activate(context: vscode.ExtensionContext): void {
-    const store = new RequestStateService(context.workspaceState);
-    const workspaceService = new WorkspaceService(context.globalState);
+    const secrets = new SecretStore(context.secrets);
+    const store = new RequestStateService(context.workspaceState, secrets);
+    const workspaceService = new WorkspaceService(context.globalState, secrets);
     const collectionsView = new CollectionsViewProvider(
         context.extensionUri,
         workspaceService,
@@ -46,6 +48,8 @@ export function activate(context: vscode.ExtensionContext): void {
             RequestPanel.show(context, deps).triggerSave();
         })
     );
+    void workspaceService.restoreSecrets();
+    void store.migrate();
     if (workspaceService.loadRepairs.length > 0) {
         void reportRepairs(workspaceService.loadRepairs);
     }
