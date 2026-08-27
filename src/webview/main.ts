@@ -43,17 +43,12 @@ function mount(mascotUri: string): void {
     emit('response', 'active');
 }
 
-function remountRequest(): void {
-    emit('method', 'url', 'params', 'headers', 'body', 'auth', 'settings', 'requestTab', 'active');
-}
-
 window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
     const message = event.data;
 
     switch (message.type) {
         case 'init':
-            hydrate(message.state);
-            setActive(message.active);
+            hydrate(message.state, message.active);
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
             mount(message.mascotUri);
             break;
@@ -61,22 +56,17 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
             break;
         case 'loadRequest':
-            hydrate(message.state);
-            setActive(message.active);
             state.response = null;
             state.error = null;
             state.loading = false;
-            remountRequest();
-            emit('response');
+            hydrate(message.state, message.active);
             break;
         case 'activeChanged':
             setActive(message.active);
-            emit('active');
             break;
         case 'saved':
-            setActive(message.active);
             markSaved();
-            emit('active');
+            setActive(message.active);
             break;
         case 'response':
             if (message.requestId !== state.requestId) {

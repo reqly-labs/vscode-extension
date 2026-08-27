@@ -13,18 +13,21 @@ export interface AppState extends WebviewState {
     baseline: string;
 }
 
-export type Channel =
-    | 'method'
-    | 'url'
-    | 'requestTab'
-    | 'params'
-    | 'headers'
-    | 'body'
-    | 'auth'
-    | 'settings'
-    | 'response'
-    | 'responseTab'
-    | 'active';
+export const CHANNELS = [
+    'method',
+    'url',
+    'requestTab',
+    'params',
+    'headers',
+    'body',
+    'auth',
+    'settings',
+    'response',
+    'responseTab',
+    'active',
+] as const;
+
+export type Channel = (typeof CHANNELS)[number];
 
 type Listener = () => void;
 
@@ -50,13 +53,18 @@ export function fingerprint(): string {
     return JSON.stringify(state.snapshot);
 }
 
-export function setActive(info: ActiveRequestInfo | undefined): void {
+function assignActive(info: ActiveRequestInfo | undefined): void {
     state.active = {
         id: info?.id ?? null,
         name: info?.name ?? '',
         location: info?.location ?? '',
     };
     state.activeRequestId = state.active.id;
+}
+
+export function setActive(info: ActiveRequestInfo | undefined): void {
+    assignActive(info);
+    emit('active');
 }
 
 export function markSaved(): void {
@@ -88,13 +96,14 @@ function applySettings(target: RequestSettings, next: RequestSettings): void {
     Object.assign(target, next);
 }
 
-export function hydrate(next: WebviewState): void {
+export function hydrate(next: WebviewState, active?: ActiveRequestInfo): void {
     applySnapshot(state.snapshot, { ...createSnapshot(), ...next.snapshot });
     applySettings(state.settings, { ...createSettings(), ...next.settings });
     state.activeRequestTab = next.activeRequestTab || 'params';
     state.activeResponseTab = next.activeResponseTab || 'body';
-    state.activeRequestId = next.activeRequestId ?? null;
+    assignActive(active ?? { id: next.activeRequestId, name: '', location: '' });
     markSaved();
+    emit();
 }
 
 export function on(channel: Channel, listener: Listener): void {
@@ -105,7 +114,7 @@ export function on(channel: Channel, listener: Listener): void {
 }
 
 export function emit(...channels: Channel[]): void {
-    for (const channel of channels) {
+    for (const channel of channels.length > 0 ? channels : CHANNELS) {
         listeners.get(channel)?.forEach((listener) => listener());
     }
 }

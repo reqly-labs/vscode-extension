@@ -50,10 +50,7 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
 
                 if (pasted && applyCurl(pasted)) {
                     event.preventDefault();
-                    urlInput.value = state.snapshot.url;
-                    methodSelect.setValue(state.snapshot.method);
-                    shell.className = `url-shell method-border-${state.snapshot.method.toLowerCase()}`;
-                    emit('params', 'headers', 'body', 'auth', 'requestTab');
+                    emit();
                     schedulePersist();
                     post({ type: 'notify', level: 'info', text: 'cURL command imported.' });
                 }
@@ -91,7 +88,9 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
         shell.className = `url-shell method-border-${state.snapshot.method.toLowerCase()}`;
     });
     on('url', () => {
-        urlInput.value = state.snapshot.url;
+        if (urlInput.value !== state.snapshot.url) {
+            urlInput.value = state.snapshot.url;
+        }
     });
     on('response', () => {
         sendButton.classList.toggle('is-loading', state.loading);
