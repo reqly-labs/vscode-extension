@@ -1,5 +1,5 @@
-import './styles.css';
 import type { HostMessage } from '../core/messages';
+import { cancel, send } from './actions';
 import { flushPersist, post } from './bridge';
 import { createRequestEditor } from './components/requestEditor';
 import { createRequestHeader, requestSave } from './components/requestHeader';
@@ -8,37 +8,8 @@ import { createSplitView } from './components/splitView';
 import { createUrlBar } from './components/urlBar';
 import { el, replace } from './dom';
 import { emit, hydrate, markSaved, setActive, state } from './store';
+import './styles.css';
 const root = document.getElementById('root') as HTMLElement;
-function send(): void {
-    if (state.loading) {
-        return;
-    }
-    if (!state.snapshot.url.trim()) {
-        post({ type: 'notify', level: 'warn', text: 'Enter a URL before sending the request.' });
-        return;
-    }
-    state.requestId += 1;
-    state.loading = true;
-    state.response = null;
-    state.error = null;
-    emit('response');
-    flushPersist();
-    post({
-        type: 'send',
-        requestId: state.requestId,
-        snapshot: state.snapshot,
-        settings: state.settings,
-    });
-}
-function cancel(): void {
-    if (!state.loading) {
-        return;
-    }
-    state.requestId += 1;
-    state.loading = false;
-    emit('response');
-    post({ type: 'cancel' });
-}
 function buildTopBar(mascotUri: string): HTMLElement {
     return el(
         'header',

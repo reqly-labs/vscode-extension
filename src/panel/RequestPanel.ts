@@ -169,10 +169,7 @@ export class RequestPanel {
                 }
                 break;
             case 'persist':
-                await this.store.write({
-                    ...message.state,
-                    activeRequestId: this.activeRequestId,
-                });
+                await this.store.writeFromWebview(message.state, this.activeRequestId);
                 break;
             case 'save':
                 await this.saveActive(message.snapshot);
@@ -216,6 +213,8 @@ export class RequestPanel {
         );
         if (!result.ok) {
             this.activeRequestId = null;
+            this.deps.onActiveChanged?.();
+            this.send({ type: 'activeChanged', active: this.describeActive() });
             void vscode.window.showWarningMessage(result.reason);
             await this.saveAs(snapshot);
             return;

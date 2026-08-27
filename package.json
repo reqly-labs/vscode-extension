@@ -135,6 +135,7 @@
         "@reqly/design-system": "^1.1.1"
     },
     "devDependencies": {
+        "@types/jsdom": "^30.0.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "24.x",
         "@types/vscode": "^1.134.0",
@@ -143,6 +144,7 @@
         "@vscode/vsce": "^3.9.2",
         "esbuild": "^0.28.1",
         "eslint": "^10.5.0",
+        "jsdom": "^29.1.1",
         "npm-run-all": "^4.1.5",
         "prettier": "^3.9.6",
         "typescript": "^6.0.3",

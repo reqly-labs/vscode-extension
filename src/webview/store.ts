@@ -1,6 +1,6 @@
 import type { ActiveRequestInfo, WebviewState } from '../core/messages';
+import type { HttpResponse, RequestError, RequestSettings, RequestSnapshot } from '../core/types';
 import { createSettings, createSnapshot } from '../core/types';
-import type { HttpResponse, RequestError } from '../core/types';
 export interface AppState extends WebviewState {
     loading: boolean;
     response: HttpResponse | null;
@@ -49,6 +49,7 @@ export function setActive(info: ActiveRequestInfo | undefined): void {
         name: info?.name ?? '',
         location: info?.location ?? '',
     };
+    state.activeRequestId = state.active.id;
 }
 export function markSaved(): void {
     state.baseline = fingerprint();
@@ -56,9 +57,29 @@ export function markSaved(): void {
 export function isDirty(): boolean {
     return state.baseline !== fingerprint();
 }
+function refill<T>(target: T[], next: readonly T[]): void {
+    target.splice(0, target.length, ...next);
+}
+function applySnapshot(target: RequestSnapshot, next: RequestSnapshot): void {
+    target.method = next.method;
+    target.url = next.url;
+    target.bodyType = next.bodyType;
+    target.body = next.body;
+    target.binaryPath = next.binaryPath;
+    target.auth = next.auth;
+    refill(target.params, next.params);
+    refill(target.headers, next.headers);
+    refill(target.formBody, next.formBody);
+    refill(target.multipartBody, next.multipartBody);
+}
+function applySettings(target: RequestSettings, next: RequestSettings): void {
+    target.timeout = next.timeout;
+    target.followRedirects = next.followRedirects;
+    target.rejectUnauthorized = next.rejectUnauthorized;
+}
 export function hydrate(next: WebviewState): void {
-    state.snapshot = { ...createSnapshot(), ...next.snapshot };
-    state.settings = { ...createSettings(), ...next.settings };
+    applySnapshot(state.snapshot, { ...createSnapshot(), ...next.snapshot });
+    applySettings(state.settings, { ...createSettings(), ...next.settings });
     state.activeRequestTab = next.activeRequestTab || 'params';
     state.activeResponseTab = next.activeResponseTab || 'body';
     state.activeRequestId = next.activeRequestId ?? null;
