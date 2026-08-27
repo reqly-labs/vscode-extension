@@ -18,7 +18,6 @@ export class RequestStateService {
     async write(state: WebviewState): Promise<void> {
         await this.memento.update(STORAGE_KEY, state);
     }
-    
     async writeFromWebview(state: WebviewState, activeRequestId: string | null): Promise<boolean> {
         if (state.activeRequestId !== activeRequestId) {
             return false;

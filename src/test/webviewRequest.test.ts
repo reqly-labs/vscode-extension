@@ -37,7 +37,6 @@ suite('webview request flow', () => {
     test('sends a URL typed after another request was loaded into the panel', () => {
         harness.store.hydrate(webviewState({ url: 'https://api.example.com/seed' }, 'req-seed'));
         mountUrlBar();
-        // The panel now loads a freshly created request, which starts with no URL.
         harness.store.hydrate(webviewState({}, 'req-new'));
         harness.store.emit('method', 'url', 'params', 'headers', 'body', 'auth');
         const input = urlInputOf(harness);

@@ -5,6 +5,8 @@ import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
 import { MAX_REDIRECTS } from '../core/constants';
 import type { HttpMethod, RequestSettings, ResponseTimings } from '../core/types';
 import type { WireRequest } from './buildRequest';
+import { trustedContext } from './certificates';
+
 export class TransportError extends Error {
     constructor(
         message: string,
@@ -13,6 +15,7 @@ export class TransportError extends Error {
         super(message);
     }
 }
+
 export interface RawResponse {
     status: number;
     statusText: string;
@@ -23,7 +26,14 @@ export interface RawResponse {
     redirects: string[];
     finalUrl: string;
 }
+
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+let agent: https.Agent | undefined;
+function secureAgent(): https.Agent {
+    agent ??= new https.Agent({ keepAlive: true, secureContext: trustedContext() });
+    return agent;
+}
+
 function decompressor(encoding: string | undefined): Duplex | null {
     switch (encoding?.trim().toLowerCase()) {
         case 'gzip':
@@ -37,6 +47,7 @@ function decompressor(encoding: string | undefined): Duplex | null {
             return null;
     }
 }
+
 function collectHeaders(raw: string[]): [string, string][] {
     const headers: [string, string][] = [];
     for (let i = 0; i < raw.length; i += 2) {
@@ -85,7 +96,8 @@ function performExchange(
     signal: AbortSignal
 ): Promise<Exchange> {
     return new Promise<Exchange>((resolve, reject) => {
-        const transport = url.protocol === 'https:' ? https : http;
+        const secure = url.protocol === 'https:';
+        const transport = secure ? https : http;
         const start = performance.now();
         const marks = { dns: 0, connect: 0, tls: 0, firstByte: 0 };
         const request = transport.request(
@@ -94,6 +106,7 @@ function performExchange(
                 method,
                 headers,
                 rejectUnauthorized: settings.rejectUnauthorized,
+                agent: secure ? secureAgent() : undefined,
                 signal,
             },
             (response) => {
@@ -162,6 +175,12 @@ function durations(
         total: Math.round(elapsed),
     };
 }
+function untrustedCertificate(message: string, error: NodeJS.ErrnoException): TransportError {
+    return new TransportError(
+        message,
+        `${error.message}. Install the issuing CA in the system certificate store, or turn off "Verify TLS certificates" in the request settings.`
+    );
+}
 function toTransportError(error: NodeJS.ErrnoException, url: URL): TransportError {
     switch (error.code) {
         case 'ABORT_ERR':
@@ -175,13 +194,28 @@ function toTransportError(error: NodeJS.ErrnoException, url: URL): TransportErro
             return new TransportError('The connection was reset by the server.', error.message);
         case 'ETIMEDOUT':
             return new TransportError(`Connection to ${url.host} timed out.`, error.message);
-        case 'DEPTH_ZERO_SELF_SIGNED_CERT':
-        case 'SELF_SIGNED_CERT_IN_CHAIN':
-        case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
         case 'CERT_HAS_EXPIRED':
             return new TransportError(
-                'TLS certificate could not be verified. Disable certificate validation in the request settings to continue.',
+                `The TLS certificate for ${url.host} has expired.`,
                 error.message
+            );
+        case 'ERR_TLS_CERT_ALTNAME_INVALID':
+            return new TransportError(
+                `The TLS certificate for ${url.host} was issued for a different host.`,
+                error.message
+            );
+        case 'DEPTH_ZERO_SELF_SIGNED_CERT':
+        case 'SELF_SIGNED_CERT_IN_CHAIN':
+            return untrustedCertificate(
+                `The TLS certificate for ${url.host} is self-signed.`,
+                error
+            );
+        case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
+        case 'UNABLE_TO_GET_ISSUER_CERT':
+        case 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY':
+            return untrustedCertificate(
+                `The TLS certificate chain for ${url.host} could not be verified.`,
+                error
             );
         default:
             return new TransportError(error.message || 'The request failed.', error.code);

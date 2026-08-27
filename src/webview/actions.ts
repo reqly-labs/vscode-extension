@@ -1,7 +1,6 @@
 import { flushPersist, post } from './bridge';
 import { emit, state } from './store';
 export const EMPTY_URL_MESSAGE = 'Enter a URL before sending the request.';
-
 export function send(): void {
     if (state.loading) {
         return;
