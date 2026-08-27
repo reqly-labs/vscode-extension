@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict';
+import { X509Certificate } from 'node:crypto';
 import * as https from 'node:https';
 import { AddressInfo } from 'node:net';
-import { X509Certificate } from 'node:crypto';
 import { createSettings, createSnapshot } from '../core/types';
 import { buildRequest } from '../http/buildRequest';
 import {
@@ -11,6 +11,7 @@ import {
     trustedContext,
 } from '../http/certificates';
 import { executeRequest, TransportError } from '../http/executeRequest';
+
 const CERT = `-----BEGIN CERTIFICATE-----
 MIIDKTCCAhGgAwIBAgIUEb6BXa0pR4CCN+TsVgFLiP1qa9EwDQYJKoZIhvcNAQEL
 BQAwFTETMBEGA1UEAwwKcmVxbHktdGVzdDAgFw0yNjA4MjcxOTI0MTZaGA8yMTI2
@@ -58,34 +59,42 @@ NrR3ZkEo13zR42Vjv1ItDV5keOCla3TXS4xaNwECgYEAuEQubg8wqiRnmmm6wsuk
 okHoL8P3Vq+4sJ8DgfrTbsvL2tugM4DTOYUPWEIf5oSqm1JoLMnDRfROKqAx+GYF
 ZxUM3Frr7+Zjwhl0YUYicfU=
 -----END PRIVATE KEY-----`;
+
 async function failedRequest(url: string): Promise<TransportError> {
     const wire = await buildRequest({ ...createSnapshot(), url });
+
     try {
         await executeRequest(wire, createSettings(), new AbortController().signal);
     } catch (error) {
         assert.ok(error instanceof TransportError, `expected a TransportError, got ${error}`);
+
         return error;
     }
+
     throw new Error('expected the request to be rejected');
 }
+
 suite('certificates', () => {
     test('drops blanks and duplicates while merging sources', () => {
         assert.deepEqual(mergeCertificates(['a', 'b'], ['b ', '', '   '], ['c']), ['a', 'b', 'c']);
     });
     test('keeps every certificate Node bundles', () => {
         const trusted = new Set(trustedCertificates());
+
         for (const certificate of readCertificates('bundled')) {
             assert.ok(trusted.has(certificate.trim()), 'a bundled CA was dropped');
         }
     });
     test('adds the certificates installed on this machine', () => {
         const trusted = new Set(trustedCertificates());
+
         for (const certificate of readCertificates('system')) {
             assert.ok(trusted.has(certificate.trim()), 'a system CA was not trusted');
         }
     });
     test('honours NODE_EXTRA_CA_CERTS', () => {
         const trusted = new Set(trustedCertificates());
+
         for (const certificate of readCertificates('extra')) {
             assert.ok(trusted.has(certificate.trim()), 'an extra CA was not trusted');
         }
@@ -103,6 +112,7 @@ suite('certificates', () => {
 suite('tls failures', () => {
     let server: https.Server;
     let base: string;
+
     suiteSetup(async () => {
         server = https.createServer({ cert: CERT, key: KEY }, (_request, response) => {
             response.writeHead(200, { 'content-type': 'text/plain' });
@@ -116,11 +126,13 @@ suite('tls failures', () => {
     });
     test('names the host and the reason instead of a generic failure', async () => {
         const error = await failedRequest(base);
+
         assert.match(error.message, /self-signed/);
         assert.match(error.message, /127\.0\.0\.1/);
     });
     test('points at the system certificate store before the escape hatch', async () => {
         const error = await failedRequest(base);
+
         assert.match(error.detail ?? '', /system certificate store/);
         assert.match(error.detail ?? '', /Verify TLS certificates/);
     });
@@ -131,11 +143,13 @@ suite('tls failures', () => {
             { ...createSettings(), rejectUnauthorized: false },
             new AbortController().signal
         );
+
         assert.equal(response.status, 200);
         assert.equal(response.body.toString(), 'secure');
     });
     test('uses a fixture certificate that has not expired', () => {
         const parsed = new X509Certificate(CERT);
+
         assert.match(parsed.subject, /reqly-test/);
         assert.ok(new Date(parsed.validTo).getTime() > Date.now());
     });

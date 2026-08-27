@@ -1,4 +1,5 @@
 import { el } from './dom';
+
 const PATHS = {
     send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
     stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
@@ -23,9 +24,12 @@ const PATHS = {
     lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
 } as const;
+
 export type IconName = keyof typeof PATHS;
+
 export function icon(name: IconName, className = ''): SVGSVGElement {
     const node = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+
     node.setAttribute('viewBox', '0 0 24 24');
     node.setAttribute('fill', 'none');
     node.setAttribute('stroke', 'currentColor');
@@ -37,9 +41,12 @@ export function icon(name: IconName, className = ''): SVGSVGElement {
     if (className) {
         node.classList.add(...className.split(' '));
     }
+
     node.innerHTML = PATHS[name];
+
     return node;
 }
+
 export function iconButton(
     name: IconName,
     label: string,

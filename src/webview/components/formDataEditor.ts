@@ -3,9 +3,11 @@ import { post } from '../bridge';
 import { el, replace } from '../dom';
 import { icon, iconButton } from '../icons';
 import { createSelect, type SelectHandle } from './select';
+
 function fileName(path: string): string {
     return path.split(/[\/]/).pop() ?? path;
 }
+
 export function createFormDataEditor(options: {
     items: () => FormField[];
     onStructureChange: () => void;
@@ -39,6 +41,7 @@ export function createFormDataEditor(options: {
         rows,
         el('div', { class: 'kv-actions' }, addButton)
     );
+
     function buildValueCell(item: FormField): HTMLElement {
         if (item.type === 'file') {
             return el(
@@ -59,6 +62,7 @@ export function createFormDataEditor(options: {
                 })
             );
         }
+
         return el('input', {
             class: 'field kv-value',
             value: item.value,
@@ -72,6 +76,7 @@ export function createFormDataEditor(options: {
             },
         });
     }
+
     function buildRow(item: FormField): HTMLElement {
         const valueCell = el('div', { class: 'kv-value-cell' }, buildValueCell(item));
         const typeSelect = createSelect<'text' | 'file'>({
@@ -88,7 +93,9 @@ export function createFormDataEditor(options: {
                 options.onEdit();
             },
         });
+
         activeSelects.push(typeSelect);
+
         return el(
             'div',
             { class: `kv-row is-form${item.enabled ? '' : ' is-disabled'}` },
@@ -125,6 +132,7 @@ export function createFormDataEditor(options: {
                 () => {
                     const items = options.items();
                     const index = items.indexOf(item);
+
                     if (index >= 0) {
                         items.splice(index, 1);
                         render();
@@ -135,17 +143,23 @@ export function createFormDataEditor(options: {
             )
         );
     }
+
     function render(): void {
         activeSelects.forEach((select) => select.destroy());
         activeSelects = [];
         const items = options.items();
+
         if (items.length === 0) {
             replace(rows, el('p', { class: 'empty-hint', text: 'No form fields yet.' }));
+
             return;
         }
+
         replace(rows, ...items.map(buildRow));
     }
+
     render();
+
     return {
         root,
         refresh: render,

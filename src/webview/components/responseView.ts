@@ -7,18 +7,23 @@ import { icon } from '../icons';
 import { on, state } from '../store';
 import { createViewer } from './codeEditor';
 import { createTabs } from './tabs';
+
 function statusClass(status: number): string {
     if (status >= 200 && status < 300) {
         return 'status-success';
     }
+
     if (status >= 300 && status < 400) {
         return 'status-info';
     }
+
     if (status >= 400 && status < 500) {
         return 'status-warning';
     }
+
     return 'status-danger';
 }
+
 function fileNameFor(response: HttpResponse): string {
     const type = response.contentType.split(';')[0]?.trim() ?? '';
     const extension = type.includes('json')
@@ -28,8 +33,10 @@ function fileNameFor(response: HttpResponse): string {
           : type.includes('html')
             ? 'html'
             : type.split('/')[1] || 'txt';
+
     return `response.${extension}`;
 }
+
 export function createResponseView(): HTMLElement {
     const content = el('div', { class: 'pane-host' });
     const meta = el('div', { class: 'response-meta' });
@@ -51,15 +58,19 @@ export function createResponseView(): HTMLElement {
             schedulePersist();
         },
     });
+
     function showPane(): void {
         const panes: Record<string, HTMLElement> = {
             body: bodyPane,
             headers: headersPane,
             timeline: timelinePane,
         };
+
         replace(content, panes[state.activeResponseTab] ?? bodyPane);
     }
+
     const root = el('section', { class: 'panel response-panel' }, head, meta, content);
+
     function renderIdle(): void {
         replace(head);
         replace(meta);
@@ -73,6 +84,7 @@ export function createResponseView(): HTMLElement {
             )
         );
     }
+
     function renderLoading(): void {
         replace(head);
         replace(meta);
@@ -86,6 +98,7 @@ export function createResponseView(): HTMLElement {
             )
         );
     }
+
     function renderError(): void {
         replace(head);
         replace(meta);
@@ -102,6 +115,7 @@ export function createResponseView(): HTMLElement {
             )
         );
     }
+
     function renderMeta(response: HttpResponse): void {
         const stats = el(
             'div',
@@ -124,6 +138,7 @@ export function createResponseView(): HTMLElement {
                 : null
         );
         const actions = el('div', { class: 'meta-actions' });
+
         if (!response.binary) {
             actions.append(
                 toggleButton('Pretty', state.prettyPrint, (value) => {
@@ -153,6 +168,7 @@ export function createResponseView(): HTMLElement {
                 )
             );
         }
+
         actions.append(
             el(
                 'button',
@@ -170,6 +186,7 @@ export function createResponseView(): HTMLElement {
         );
         replace(meta, stats, actions);
     }
+
     function toggleButton(
         label: string,
         active: boolean,
@@ -182,16 +199,20 @@ export function createResponseView(): HTMLElement {
             on: {
                 click: () => {
                     const next = !button.classList.contains('is-active');
+
                     button.classList.toggle('is-active', next);
                     onChange(next);
                 },
             },
         });
+
         return button;
     }
+
     function currentText(response: HttpResponse): string {
         return state.prettyPrint ? prettyPrint(response.body, response.contentType) : response.body;
     }
+
     function renderBody(response: HttpResponse): void {
         if (response.truncated) {
             replace(
@@ -206,8 +227,10 @@ export function createResponseView(): HTMLElement {
                     el('p', { class: 'error-detail', text: 'Use Save to write it to disk.' })
                 )
             );
+
             return;
         }
+
         if (response.previewUri) {
             replace(
                 bodyPane,
@@ -217,8 +240,10 @@ export function createResponseView(): HTMLElement {
                     el('img', { src: response.previewUri, alt: 'Response preview' })
                 )
             );
+
             return;
         }
+
         if (response.binary) {
             replace(
                 bodyPane,
@@ -232,17 +257,22 @@ export function createResponseView(): HTMLElement {
                     el('p', { class: 'error-detail', text: 'Use Save to write it to disk.' })
                 )
             );
+
             return;
         }
+
         viewer.setContent(currentText(response), languageFor(response.contentType));
         viewer.setWrap(state.wrapLines);
         replace(bodyPane, viewer.root);
     }
+
     function renderHeaders(response: HttpResponse): void {
         if (response.headers.length === 0) {
             replace(headersPane, el('p', { class: 'empty-hint', text: 'No response headers.' }));
+
             return;
         }
+
         replace(
             headersPane,
             ...response.headers.map(([key, value]) =>
@@ -255,6 +285,7 @@ export function createResponseView(): HTMLElement {
             )
         );
     }
+
     function renderTimeline(response: HttpResponse): void {
         const { timings } = response;
         const phases: [string, number][] = [
@@ -265,6 +296,7 @@ export function createResponseView(): HTMLElement {
             ['Download', timings.download],
         ];
         const total = Math.max(1, timings.total);
+
         replace(
             timelinePane,
             el(
@@ -310,6 +342,7 @@ export function createResponseView(): HTMLElement {
             )
         );
     }
+
     function renderResponse(response: HttpResponse): void {
         replace(head, tabs.root);
         tabs.setBadge(
@@ -322,21 +355,29 @@ export function createResponseView(): HTMLElement {
         renderTimeline(response);
         showPane();
     }
+
     on('response', () => {
         if (state.loading) {
             renderLoading();
+
             return;
         }
+
         if (state.error) {
             renderError();
+
             return;
         }
+
         if (state.response) {
             renderResponse(state.response);
+
             return;
         }
+
         renderIdle();
     });
     renderIdle();
+
     return root;
 }

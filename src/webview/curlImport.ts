@@ -2,36 +2,48 @@ import { parseCurlCommand } from '../core/curl';
 import { formatJson, formatXml } from '../core/format';
 import { createId, emptyFormField, emptyKeyValue, type BodyType } from '../core/types';
 import { state } from './store';
+
 function inferBodyType(contentType: string, body: string): BodyType {
     const type = contentType.toLowerCase();
+
     if (type.includes('json')) {
         return 'json';
     }
+
     if (type.includes('xml')) {
         return 'xml';
     }
+
     if (type.includes('x-www-form-urlencoded')) {
         return 'form';
     }
+
     if (!body.trim()) {
         return 'none';
     }
+
     try {
         JSON.parse(body);
+
         return 'json';
     } catch {
         return 'text';
     }
 }
+
 function fill<T>(target: T[], next: T[]): void {
     target.splice(0, target.length, ...next);
 }
+
 export function applyCurl(text: string): boolean {
     const parsed = parseCurlCommand(text);
+
     if (!parsed) {
         return false;
     }
+
     const { snapshot } = state;
+
     snapshot.method = parsed.method;
     snapshot.url = parsed.url;
     snapshot.auth = { type: 'none' };
@@ -47,9 +59,11 @@ export function applyCurl(text: string): boolean {
     if (snapshot.headers.length === 0) {
         snapshot.headers.push(emptyKeyValue());
     }
+
     fill(snapshot.params, [emptyKeyValue()]);
     try {
         const url = new URL(parsed.url);
+
         if (url.search) {
             fill(
                 snapshot.params,
@@ -64,6 +78,7 @@ export function applyCurl(text: string): boolean {
             snapshot.url = url.toString();
         }
     } catch {}
+
     if (parsed.multipartFields) {
         snapshot.bodyType = 'multipart';
         snapshot.body = '';
@@ -79,6 +94,7 @@ export function applyCurl(text: string): boolean {
             )?.[1] ?? '';
         const body = parsed.data ?? '';
         const bodyType = inferBodyType(contentType, body);
+
         snapshot.bodyType = bodyType;
         if (bodyType === 'form') {
             snapshot.body = '';
@@ -89,6 +105,7 @@ export function applyCurl(text: string): boolean {
         } else {
             snapshot.body = body;
         }
+
         fill(snapshot.multipartBody, [emptyFormField()]);
         if (bodyType === 'form' && body) {
             const search = new URLSearchParams(body);
@@ -98,14 +115,18 @@ export function applyCurl(text: string): boolean {
                 value,
                 enabled: true,
             }));
+
             fill(snapshot.formBody, fields.length > 0 ? fields : [emptyKeyValue()]);
         } else {
             fill(snapshot.formBody, [emptyKeyValue()]);
         }
     }
+
     activateRelevantTab();
+
     return true;
 }
+
 function activateRelevantTab(): void {
     const { snapshot } = state;
     const hasParams = snapshot.params.some((param) => param.enabled && param.key.trim());
@@ -115,6 +136,7 @@ function activateRelevantTab(): void {
             ? snapshot.multipartBody.some((field) => field.enabled && field.key.trim())
             : snapshot.bodyType !== 'none';
     const hasAuth = snapshot.auth.type !== 'none';
+
     if (hasParams) {
         state.activeRequestTab = 'params';
     } else if (hasHeaders) {

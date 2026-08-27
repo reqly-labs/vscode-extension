@@ -1,14 +1,17 @@
 import { createThemeCss, dark, light } from '@reqly/design-system';
+
 const THEME_CSS = createThemeCss(light, dark, {
     lightSelector: ':root',
     darkSelector: ':root.reqly-dark',
 });
+
 export interface CollectionsPageOptions {
     scriptUri: string;
     styleUri: string;
     cspSource: string;
     nonce: string;
 }
+
 export function renderCollectionsPage({
     scriptUri,
     styleUri,
@@ -22,6 +25,7 @@ export function renderCollectionsPage({
         `script-src 'nonce-${nonce}'`,
         `font-src ${cspSource}`,
     ].join('; ');
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>

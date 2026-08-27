@@ -4,6 +4,7 @@ import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
 import { RequestStateService } from './services/RequestStateService';
 import { SecretStore } from './services/SecretStore';
 import { WorkspaceService } from './services/WorkspaceService';
+
 export function activate(context: vscode.ExtensionContext): void {
     const secrets = new SecretStore(context.secrets);
     const store = new RequestStateService(context.workspaceState, secrets);
@@ -24,6 +25,7 @@ export function activate(context: vscode.ExtensionContext): void {
         workspaceService,
         onActiveChanged: () => collectionsView.refresh(),
     };
+
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             CollectionsViewProvider.viewType,
@@ -54,17 +56,22 @@ export function activate(context: vscode.ExtensionContext): void {
         void reportRepairs(workspaceService.loadRepairs);
     }
 }
+
 async function reportRepairs(repairs: string[]): Promise<void> {
     const choice = await vscode.window.showWarningMessage(
         `Reqly repaired ${repairs.length} problem${repairs.length === 1 ? '' : 's'} in your saved collections.`,
         'Show details'
     );
+
     if (choice !== 'Show details') {
         return;
     }
+
     const channel = vscode.window.createOutputChannel('Reqly');
+
     channel.appendLine('Repairs applied while loading collections:');
     repairs.forEach((line) => channel.appendLine(`  - ${line}`));
     channel.show();
 }
+
 export function deactivate(): void {}

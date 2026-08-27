@@ -3,6 +3,7 @@ import { schedulePersist } from '../bridge';
 import { el } from '../dom';
 import { icon } from '../icons';
 import { on, state } from '../store';
+
 function toggleRow(
     label: string,
     description: string,
@@ -27,8 +28,10 @@ function toggleRow(
             el('span', { class: 'setting-desc', text: description })
         )
     );
+
     return { root, input };
 }
+
 export function createSettingsMenu(): {
     root: HTMLElement;
 } {
@@ -40,6 +43,7 @@ export function createSettingsMenu(): {
         on: {
             change: (event) => {
                 const parsed = Number((event.target as HTMLInputElement).value);
+
                 state.settings.timeout =
                     Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
                 schedulePersist();
@@ -99,6 +103,7 @@ export function createSettingsMenu(): {
         icon('settings')
     );
     const root = el('div', { class: 'menu settings-menu' }, trigger, panel);
+
     on('settings', () => {
         timeout.value = String(state.settings.timeout);
         redirects.input.checked = state.settings.followRedirects;
@@ -109,5 +114,6 @@ export function createSettingsMenu(): {
             root.classList.remove('is-open');
         }
     });
+
     return { root };
 }

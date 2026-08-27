@@ -135,6 +135,7 @@
         "@reqly/design-system": "^1.1.1"
     },
     "devDependencies": {
+        "@stylistic/eslint-plugin": "^5.10.0",
         "@types/jsdom": "^30.0.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "24.x",

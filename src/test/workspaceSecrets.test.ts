@@ -8,7 +8,9 @@ import { SecretStore } from '../services/SecretStore';
 import { WorkspaceService } from '../services/WorkspaceService';
 import { FakeMemento } from './FakeMemento';
 import { FakeSecretStorage } from './FakeSecretStorage';
+
 const TOKEN = 'super-secret-token-42';
+
 function tokenSnapshot(): RequestSnapshot {
     return {
         ...createSnapshot(),
@@ -16,6 +18,7 @@ function tokenSnapshot(): RequestSnapshot {
         auth: { type: 'bearer', token: TOKEN, prefix: 'Bearer' },
     };
 }
+
 function draftState(): WebviewState {
     return {
         snapshot: tokenSnapshot(),
@@ -25,6 +28,7 @@ function draftState(): WebviewState {
         activeRequestId: null,
     };
 }
+
 async function seed(): Promise<{
     memento: FakeMemento;
     storage: FakeSecretStorage;
@@ -35,26 +39,34 @@ async function seed(): Promise<{
     const storage = new FakeSecretStorage();
     const service = new WorkspaceService(memento, new SecretStore(storage));
     const collection = await service.createCollection('Catálogo');
+
     assert.ok(collection.ok);
     const request = await service.createRequest(collection.id as string, 'Listar', tokenSnapshot());
+
     assert.ok(request.ok);
+
     return { memento, storage, service, requestId: request.id as string };
 }
+
 function stored(memento: FakeMemento): string {
     return JSON.stringify(memento.get('reqly.workspace'));
 }
+
 suite('workspace secret storage', () => {
     test('never writes the credential into the plain memento', async () => {
         const { memento } = await seed();
+
         assert.equal(stored(memento).includes(TOKEN), false, 'the token reached the plain store');
     });
     test('keeps the rest of the request readable in the memento', async () => {
         const { memento } = await seed();
+
         assert.equal(stored(memento).includes('api.example.com/apartamentos'), true);
         assert.equal(stored(memento).includes('Bearer'), true);
     });
     test('hands the credential to the secret storage instead', async () => {
         const { storage, requestId } = await seed();
+
         assert.deepEqual(storage.keys(), ['reqly.secrets']);
         assert.deepEqual(JSON.parse((await storage.get('reqly.secrets')) as string), {
             [requestId]: TOKEN,
@@ -62,11 +74,13 @@ suite('workspace secret storage', () => {
     });
     test('still serves the credential to the running session', async () => {
         const { service, requestId } = await seed();
+
         assert.equal(secretOf(getRequest(service.workspace, requestId)!.snapshot.auth), TOKEN);
     });
     test('restores the credential for the next session', async () => {
         const { memento, storage, requestId } = await seed();
         const reopened = new WorkspaceService(memento, new SecretStore(storage));
+
         assert.equal(secretOf(getRequest(reopened.workspace, requestId)!.snapshot.auth), '');
         await reopened.restoreSecrets();
         assert.equal(secretOf(getRequest(reopened.workspace, requestId)!.snapshot.auth), TOKEN);
@@ -74,25 +88,30 @@ suite('workspace secret storage', () => {
     test('reads the vault once however often it is asked', async () => {
         const { memento, storage } = await seed();
         const reopened = new WorkspaceService(memento, new SecretStore(storage));
+
         await Promise.all([reopened.restoreSecrets(), reopened.restoreSecrets()]);
         await reopened.restoreSecrets();
         assert.ok(true);
     });
     test('forgets the credential when the request is deleted', async () => {
         const { storage, service, requestId } = await seed();
+
         await service.remove(requestId);
         assert.deepEqual(storage.keys(), []);
     });
     test('forgets every credential when the workspace is cleared', async () => {
         const { storage, service } = await seed();
+
         await service.clear();
         assert.deepEqual(storage.keys(), []);
     });
     test('carries the credential over to a duplicated request', async () => {
         const { storage, service, requestId } = await seed();
         const copy = await service.duplicate(requestId);
+
         assert.ok(copy.ok);
         const vault = JSON.parse((await storage.get('reqly.secrets')) as string);
+
         assert.equal(vault[copy.id as string], TOKEN);
         assert.equal(vault[requestId], TOKEN);
     });
@@ -100,16 +119,19 @@ suite('workspace secret storage', () => {
         const memento = new FakeMemento();
         const legacy = new WorkspaceService(memento);
         const collection = await legacy.createCollection('Catálogo');
+
         assert.ok(collection.ok);
         const request = await legacy.createRequest(
             collection.id as string,
             'Listar',
             tokenSnapshot()
         );
+
         assert.ok(request.ok);
         assert.equal(stored(memento).includes(TOKEN), true, 'the fixture must start exposed');
         const storage = new FakeSecretStorage();
         const upgraded = new WorkspaceService(memento, new SecretStore(storage));
+
         await upgraded.restoreSecrets();
         assert.equal(stored(memento).includes(TOKEN), false, 'the plain copy must be erased');
         assert.deepEqual(JSON.parse((await storage.get('reqly.secrets')) as string), {
@@ -122,8 +144,10 @@ suite('workspace secret storage', () => {
     });
     test('prefers the vault over a stale plain copy', async () => {
         const { memento, storage, requestId } = await seed();
+
         await memento.update('reqly.workspace', JSON.parse(stored(memento)));
         const reopened = new WorkspaceService(memento, new SecretStore(storage));
+
         await reopened.restoreSecrets();
         assert.equal(secretOf(getRequest(reopened.workspace, requestId)!.snapshot.auth), TOKEN);
     });
@@ -131,16 +155,19 @@ suite('workspace secret storage', () => {
         const memento = new FakeMemento();
         const service = new WorkspaceService(memento);
         const collection = await service.createCollection('Catálogo');
+
         assert.ok(collection.ok);
         const request = await service.createRequest(
             collection.id as string,
             'Listar',
             tokenSnapshot()
         );
+
         assert.ok(request.ok);
         await service.restoreSecrets();
         assert.equal(stored(memento).includes(TOKEN), true);
         const reopened = new WorkspaceService(memento);
+
         assert.equal(
             secretOf(getRequest(reopened.workspace, request.id as string)!.snapshot.auth),
             TOKEN
@@ -149,9 +176,11 @@ suite('workspace secret storage', () => {
     test('keeps the credential when the keychain refuses to store it', async () => {
         const memento = new FakeMemento();
         const storage = new FakeSecretStorage();
+
         storage.failing = true;
         const service = new WorkspaceService(memento, new SecretStore(storage));
         const collection = await service.createCollection('Catálogo');
+
         assert.ok(collection.ok);
         await service.createRequest(collection.id as string, 'Listar', tokenSnapshot());
         assert.equal(stored(memento).includes(TOKEN), true, 'the only copy must not be erased');
@@ -162,6 +191,7 @@ suite('draft secret storage', () => {
         const memento = new FakeMemento();
         const storage = new FakeSecretStorage();
         const store = new RequestStateService(memento, new SecretStore(storage));
+
         await store.write(draftState());
         assert.equal(JSON.stringify(memento.get('reqly.requestState')).includes(TOKEN), false);
         assert.deepEqual(storage.keys(), ['reqly.draftSecret']);
@@ -170,8 +200,10 @@ suite('draft secret storage', () => {
         const memento = new FakeMemento();
         const storage = new FakeSecretStorage();
         const store = new RequestStateService(memento, new SecretStore(storage));
+
         await store.write(draftState());
         const reopened = new RequestStateService(memento, new SecretStore(storage));
+
         assert.equal(secretOf(reopened.read().snapshot.auth), '');
         assert.equal(secretOf((await reopened.readWithSecret()).snapshot.auth), TOKEN);
     });
@@ -179,6 +211,7 @@ suite('draft secret storage', () => {
         const memento = new FakeMemento();
         const storage = new FakeSecretStorage();
         const store = new RequestStateService(memento, new SecretStore(storage));
+
         await store.write(draftState());
         await store.setActiveRequestId('req-1');
         assert.equal(store.read().activeRequestId, 'req-1');
@@ -186,10 +219,12 @@ suite('draft secret storage', () => {
     });
     test('moves a draft credential an older version left exposed', async () => {
         const memento = new FakeMemento();
+
         await new RequestStateService(memento).write(draftState());
         assert.equal(JSON.stringify(memento.get('reqly.requestState')).includes(TOKEN), true);
         const storage = new FakeSecretStorage();
         const upgraded = new RequestStateService(memento, new SecretStore(storage));
+
         await upgraded.migrate();
         assert.equal(JSON.stringify(memento.get('reqly.requestState')).includes(TOKEN), false);
         assert.equal(secretOf((await upgraded.readWithSecret()).snapshot.auth), TOKEN);
@@ -198,14 +233,17 @@ suite('draft secret storage', () => {
         const memento = new FakeMemento();
         const storage = new FakeSecretStorage();
         const store = new RequestStateService(memento, new SecretStore(storage));
+
         await store.migrate();
         assert.deepEqual(storage.keys(), []);
     });
     test('keeps the draft credential when the keychain refuses to store it', async () => {
         const memento = new FakeMemento();
         const storage = new FakeSecretStorage();
+
         storage.failing = true;
         const store = new RequestStateService(memento, new SecretStore(storage));
+
         await store.write(draftState());
         assert.equal(JSON.stringify(memento.get('reqly.requestState')).includes(TOKEN), true);
     });
@@ -213,6 +251,7 @@ suite('draft secret storage', () => {
         const memento = new FakeMemento();
         const storage = new FakeSecretStorage();
         const store = new RequestStateService(memento, new SecretStore(storage));
+
         await store.write(draftState());
         await store.reset();
         assert.deepEqual(storage.keys(), []);

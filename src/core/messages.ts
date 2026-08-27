@@ -1,4 +1,5 @@
 import type { HttpResponse, RequestError, RequestSettings, RequestSnapshot } from './types';
+
 export interface WebviewState {
     snapshot: RequestSnapshot;
     settings: RequestSettings;
@@ -6,11 +7,13 @@ export interface WebviewState {
     activeResponseTab: string;
     activeRequestId: string | null;
 }
+
 export interface ActiveRequestInfo {
     id: string | null;
     name: string;
     location: string;
 }
+
 export type HostMessage =
     | {
           type: 'init';
@@ -56,6 +59,7 @@ export type HostMessage =
           type: 'command';
           name: 'send' | 'cancel' | 'save';
       };
+
 export type PanelMessage =
     | {
           type: 'ready';

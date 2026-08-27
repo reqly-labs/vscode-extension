@@ -8,6 +8,7 @@ import { emit, on, state } from '../store';
 import { applyCurl } from '../curlImport';
 import { createSelect } from './select';
 import { createSettingsMenu } from './settingsMenu';
+
 export function createUrlBar(options: { onSend: () => void; onCancel: () => void }): HTMLElement {
     const shell = el('div', {
         class: `url-shell method-border-${state.snapshot.method.toLowerCase()}`,
@@ -46,6 +47,7 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
             },
             paste: (event) => {
                 const pasted = (event as ClipboardEvent).clipboardData?.getData('text');
+
                 if (pasted && applyCurl(pasted)) {
                     event.preventDefault();
                     urlInput.value = state.snapshot.url;
@@ -58,6 +60,7 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
             },
         },
     });
+
     shell.append(methodSelect.root, el('div', { class: 'url-divider' }), urlInput);
     const sendLabel = el('span', { text: 'Send' });
     const sendIcon = el('span', { class: 'send-icon' }, icon('send'));
@@ -82,6 +85,7 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
         el('div', { class: 'send-group' }, sendButton, menu.root),
         settings.root
     );
+
     on('method', () => {
         methodSelect.setValue(state.snapshot.method);
         shell.className = `url-shell method-border-${state.snapshot.method.toLowerCase()}`;
@@ -94,8 +98,10 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
         sendLabel.textContent = state.loading ? 'Cancel' : 'Send';
         replace(sendIcon, icon(state.loading ? 'stop' : 'send'));
     });
+
     return bar;
 }
+
 function createSendMenu(): {
     root: HTMLElement;
 } {
@@ -132,6 +138,7 @@ function createSendMenu(): {
             icon(name),
             label
         );
+
     list.append(
         item('copy', 'Copy URL', () => {
             if (state.snapshot.url.trim()) {
@@ -142,6 +149,7 @@ function createSendMenu(): {
             if (!state.snapshot.url.trim()) {
                 return;
             }
+
             try {
                 post({
                     type: 'copy',
@@ -158,5 +166,6 @@ function createSendMenu(): {
             root.classList.remove('is-open');
         }
     });
+
     return { root };
 }

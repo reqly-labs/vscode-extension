@@ -1,5 +1,6 @@
 import type { HttpMethod } from './types';
 import type { NodeKind } from './workspace';
+
 export interface TreeRow {
     id: string;
     kind: NodeKind;
@@ -12,10 +13,12 @@ export interface TreeRow {
     url?: string;
     isActive: boolean;
 }
+
 export interface TreeStats {
     collections: number;
     requests: number;
 }
+
 export type CollectionsHostMessage =
     | {
           type: 'render';
@@ -32,6 +35,7 @@ export type CollectionsHostMessage =
           type: 'beginRename';
           id: string;
       };
+
 export type CollectionsViewMessage =
     | {
           type: 'ready';

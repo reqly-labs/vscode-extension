@@ -3,9 +3,11 @@ import type { WebviewState } from '../core/messages';
 import type { RequestSnapshot } from '../core/types';
 import { hydrate, isDirty, persistable, setActive, state } from '../webview/store';
 import { webviewState } from './webviewHarness';
+
 function loadRequest(snapshot: Partial<RequestSnapshot>, id: string | null = null): void {
     hydrate(webviewState(snapshot, id));
 }
+
 suite('webview store', () => {
     setup(() => {
         loadRequest({});
@@ -13,6 +15,7 @@ suite('webview store', () => {
     });
     test('keeps the snapshot object identity across hydrations', () => {
         const first = state.snapshot;
+
         loadRequest({ url: 'https://api.example.com/one' }, 'req-1');
         loadRequest({ url: 'https://api.example.com/two' }, 'req-2');
         assert.equal(state.snapshot, first, 'hydrate must not swap the snapshot object');
@@ -20,6 +23,7 @@ suite('webview store', () => {
     });
     test('keeps collection identities and replaces their contents', () => {
         const { params, headers, formBody, multipartBody } = state.snapshot;
+
         loadRequest({
             params: [{ id: 'p1', key: 'q', value: 'ducks', enabled: true }],
             headers: [],
@@ -43,6 +47,7 @@ suite('webview store', () => {
             ...webviewState({}),
             snapshot: { url: 'https://api.example.com/next' } as RequestSnapshot,
         } satisfies WebviewState;
+
         hydrate(partial);
         assert.equal(state.snapshot.method, 'GET');
         assert.equal(state.snapshot.bodyType, 'none');

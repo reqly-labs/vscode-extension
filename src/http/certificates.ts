@@ -7,9 +7,11 @@ let context: tls.SecureContext | undefined;
 
 export function mergeCertificates(...sources: readonly (readonly string[])[]): string[] {
     const merged = new Set<string>();
+
     for (const source of sources) {
         for (const certificate of source) {
             const trimmed = certificate.trim();
+
             if (trimmed) {
                 merged.add(trimmed);
             }
@@ -40,7 +42,9 @@ export function trustedCertificates(): string[] {
 
     return trusted;
 }
+
 export function trustedContext(): tls.SecureContext {
     context ??= tls.createSecureContext({ ca: trustedCertificates() });
+
     return context;
 }

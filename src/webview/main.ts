@@ -9,7 +9,9 @@ import { createUrlBar } from './components/urlBar';
 import { el, replace } from './dom';
 import { emit, hydrate, markSaved, setActive, state } from './store';
 import './styles.css';
+
 const root = document.getElementById('root') as HTMLElement;
+
 function buildTopBar(mascotUri: string): HTMLElement {
     return el(
         'header',
@@ -31,18 +33,23 @@ function buildTopBar(mascotUri: string): HTMLElement {
         })
     );
 }
+
 function mount(mascotUri: string): void {
     const header = createRequestHeader({ onSave: requestSave });
     const urlBar = createUrlBar({ onSend: send, onCancel: cancel });
     const split = createSplitView(createRequestEditor(), createResponseView());
+
     replace(root, buildTopBar(mascotUri), header, urlBar, split);
     emit('response', 'active');
 }
+
 function remountRequest(): void {
     emit('method', 'url', 'params', 'headers', 'body', 'auth', 'settings', 'requestTab', 'active');
 }
+
 window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
     const message = event.data;
+
     switch (message.type) {
         case 'init':
             hydrate(message.state);
@@ -75,6 +82,7 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             if (message.requestId !== state.requestId) {
                 return;
             }
+
             state.loading = false;
             state.error = null;
             state.response = message.response;
@@ -84,6 +92,7 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             if (message.requestId !== state.requestId) {
                 return;
             }
+
             state.loading = false;
             state.response = null;
             state.error = message.error;
@@ -97,6 +106,7 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             } else {
                 cancel();
             }
+
             break;
         case 'filePicked':
             if (message.target === 'binary') {
@@ -105,10 +115,12 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
                 const field = state.snapshot.multipartBody.find(
                     (entry) => entry.id === message.fieldId
                 );
+
                 if (field) {
                     field.filePath = message.path;
                 }
             }
+
             emit('body');
             flushPersist();
             break;
@@ -116,11 +128,14 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
 });
 window.addEventListener('keydown', (event) => {
     const modifier = event.ctrlKey || event.metaKey;
+
     if (modifier && event.key === 'Enter') {
         event.preventDefault();
         send();
+
         return;
     }
+
     if (modifier && event.key.toLowerCase() === 's') {
         event.preventDefault();
         requestSave();

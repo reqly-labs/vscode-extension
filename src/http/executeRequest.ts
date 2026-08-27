@@ -29,8 +29,10 @@ export interface RawResponse {
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 let agent: https.Agent | undefined;
+
 function secureAgent(): https.Agent {
     agent ??= new https.Agent({ keepAlive: true, secureContext: trustedContext() });
+
     return agent;
 }
 
@@ -50,15 +52,20 @@ function decompressor(encoding: string | undefined): Duplex | null {
 
 function collectHeaders(raw: string[]): [string, string][] {
     const headers: [string, string][] = [];
+
     for (let i = 0; i < raw.length; i += 2) {
         headers.push([raw[i], raw[i + 1]]);
     }
+
     return headers;
 }
+
 function headerValue(headers: [string, string][], name: string): string | undefined {
     const lower = name.toLowerCase();
+
     return headers.find(([key]) => key.toLowerCase() === lower)?.[1];
 }
+
 function headersForRedirect(
     headers: Record<string, string>,
     from: URL,
@@ -67,18 +74,24 @@ function headersForRedirect(
 ): Record<string, string> {
     const sameOrigin = from.origin === to.origin;
     const next: Record<string, string> = {};
+
     for (const [key, value] of Object.entries(headers)) {
         const lower = key.toLowerCase();
+
         if (!sameOrigin && (lower === 'authorization' || lower === 'cookie')) {
             continue;
         }
+
         if (!keepBody && (lower === 'content-length' || lower === 'content-type')) {
             continue;
         }
+
         next[key] = value;
     }
+
     return next;
 }
+
 interface Exchange {
     status: number;
     statusText: string;
@@ -87,6 +100,7 @@ interface Exchange {
     body: Buffer;
     timings: ResponseTimings;
 }
+
 function performExchange(
     url: URL,
     method: HttpMethod,
@@ -115,6 +129,7 @@ function performExchange(
                 const decoder = decompressor(headerValue(rawHeaders, 'content-encoding'));
                 const stream = decoder ? response.pipe(decoder) : response;
                 const chunks: Buffer[] = [];
+
                 stream.on('data', (chunk: Buffer) => chunks.push(chunk));
                 stream.on('error', (error: NodeJS.ErrnoException) =>
                     reject(new TransportError('Failed to read the response body.', error.message))
@@ -131,6 +146,7 @@ function performExchange(
                 );
             }
         );
+
         request.setTimeout(settings.timeout, () => {
             request.destroy(new TransportError(`Request timed out after ${settings.timeout} ms.`));
         });
@@ -138,6 +154,7 @@ function performExchange(
             if (!socket.connecting) {
                 return;
             }
+
             socket.once('lookup', () => (marks.dns = performance.now() - start));
             socket.once('connect', () => (marks.connect = performance.now() - start));
             socket.once('secureConnect', () => (marks.tls = performance.now() - start));
@@ -145,16 +162,20 @@ function performExchange(
         request.on('error', (error: NodeJS.ErrnoException) => {
             if (error instanceof TransportError) {
                 reject(error);
+
                 return;
             }
+
             reject(toTransportError(error, url));
         });
         if (body) {
             request.write(body);
         }
+
         request.end();
     });
 }
+
 function durations(
     marks: {
         dns: number;
@@ -166,6 +187,7 @@ function durations(
 ): ResponseTimings {
     const span = (from: number, to: number) => Math.round(Math.max(0, to - from));
     const connected = Math.max(marks.tls, marks.connect, marks.dns);
+
     return {
         dns: span(0, marks.dns),
         connect: marks.connect > 0 ? span(marks.dns, marks.connect) : 0,
@@ -175,12 +197,14 @@ function durations(
         total: Math.round(elapsed),
     };
 }
+
 function untrustedCertificate(message: string, error: NodeJS.ErrnoException): TransportError {
     return new TransportError(
         message,
         `${error.message}. Install the issuing CA in the system certificate store, or turn off "Verify TLS certificates" in the request settings.`
     );
 }
+
 function toTransportError(error: NodeJS.ErrnoException, url: URL): TransportError {
     switch (error.code) {
         case 'ABORT_ERR':
@@ -221,6 +245,7 @@ function toTransportError(error: NodeJS.ErrnoException, url: URL): TransportErro
             return new TransportError(error.message || 'The request failed.', error.code);
     }
 }
+
 export async function executeRequest(
     wire: WireRequest,
     settings: RequestSettings,
@@ -239,8 +264,10 @@ export async function executeRequest(
         download: 0,
         total: 0,
     };
+
     for (let hop = 0; ; hop++) {
         const exchange = await performExchange(url, method, headers, body, settings, signal);
+
         totals.dns += exchange.timings.dns;
         totals.connect += exchange.timings.connect;
         totals.tls += exchange.timings.tls;
@@ -249,6 +276,7 @@ export async function executeRequest(
         totals.total += exchange.timings.total;
         const location = headerValue(exchange.headers, 'location');
         const isRedirect = REDIRECT_STATUSES.has(exchange.status) && Boolean(location);
+
         if (!settings.followRedirects || !isRedirect) {
             return {
                 status: exchange.status,
@@ -261,17 +289,21 @@ export async function executeRequest(
                 finalUrl: url.toString(),
             };
         }
+
         if (hop >= MAX_REDIRECTS) {
             throw new TransportError(`Too many redirects (stopped after ${MAX_REDIRECTS} hops).`);
         }
+
         const target = new URL(location as string, url);
         const dropsBody = exchange.status === 303 || (exchange.status < 307 && method === 'POST');
+
         redirects.push(target.toString());
         headers = headersForRedirect(headers, url, target, !dropsBody);
         if (dropsBody) {
             method = 'GET';
             body = undefined;
         }
+
         url = target;
     }
 }

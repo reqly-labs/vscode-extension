@@ -1,6 +1,7 @@
 import type { ActiveRequestInfo, WebviewState } from '../core/messages';
 import type { HttpResponse, RequestError, RequestSettings, RequestSnapshot } from '../core/types';
 import { createSettings, createSnapshot } from '../core/types';
+
 export interface AppState extends WebviewState {
     loading: boolean;
     response: HttpResponse | null;
@@ -11,6 +12,7 @@ export interface AppState extends WebviewState {
     active: ActiveRequestInfo;
     baseline: string;
 }
+
 export type Channel =
     | 'method'
     | 'url'
@@ -23,8 +25,11 @@ export type Channel =
     | 'response'
     | 'responseTab'
     | 'active';
+
 type Listener = () => void;
+
 const listeners = new Map<Channel, Set<Listener>>();
+
 export const state: AppState = {
     snapshot: createSnapshot(),
     settings: createSettings(),
@@ -40,9 +45,11 @@ export const state: AppState = {
     active: { id: null, name: '', location: '' },
     baseline: '',
 };
+
 export function fingerprint(): string {
     return JSON.stringify(state.snapshot);
 }
+
 export function setActive(info: ActiveRequestInfo | undefined): void {
     state.active = {
         id: info?.id ?? null,
@@ -51,15 +58,19 @@ export function setActive(info: ActiveRequestInfo | undefined): void {
     };
     state.activeRequestId = state.active.id;
 }
+
 export function markSaved(): void {
     state.baseline = fingerprint();
 }
+
 export function isDirty(): boolean {
     return state.baseline !== fingerprint();
 }
+
 function refill<T>(target: T[], next: readonly T[]): void {
     target.splice(0, target.length, ...next);
 }
+
 function applySnapshot(target: RequestSnapshot, next: RequestSnapshot): void {
     target.method = next.method;
     target.url = next.url;
@@ -72,11 +83,13 @@ function applySnapshot(target: RequestSnapshot, next: RequestSnapshot): void {
     refill(target.formBody, next.formBody);
     refill(target.multipartBody, next.multipartBody);
 }
+
 function applySettings(target: RequestSettings, next: RequestSettings): void {
     target.timeout = next.timeout;
     target.followRedirects = next.followRedirects;
     target.rejectUnauthorized = next.rejectUnauthorized;
 }
+
 export function hydrate(next: WebviewState): void {
     applySnapshot(state.snapshot, { ...createSnapshot(), ...next.snapshot });
     applySettings(state.settings, { ...createSettings(), ...next.settings });
@@ -85,16 +98,20 @@ export function hydrate(next: WebviewState): void {
     state.activeRequestId = next.activeRequestId ?? null;
     markSaved();
 }
+
 export function on(channel: Channel, listener: Listener): void {
     const set = listeners.get(channel) ?? new Set();
+
     set.add(listener);
     listeners.set(channel, set);
 }
+
 export function emit(...channels: Channel[]): void {
     for (const channel of channels) {
         listeners.get(channel)?.forEach((listener) => listener());
     }
 }
+
 export function persistable(): WebviewState {
     return {
         snapshot: state.snapshot,

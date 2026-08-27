@@ -1,10 +1,12 @@
 import { emptyKeyValue, type KeyValue } from '../../core/types';
 import { el, replace } from '../dom';
 import { icon, iconButton } from '../icons';
+
 export interface KvEditorHandle {
     root: HTMLElement;
     refresh(): void;
 }
+
 export function createKvEditor(options: {
     items: () => KeyValue[];
     onStructureChange: () => void;
@@ -37,17 +39,22 @@ export function createKvEditor(options: {
         rows,
         el('div', { class: 'kv-actions' }, addButton)
     );
+
     function render(): void {
         const items = options.items();
+
         if (items.length === 0) {
             replace(
                 rows,
                 el('p', { class: 'empty-hint', text: options.emptyLabel ?? 'No entries yet.' })
             );
+
             return;
         }
+
         replace(rows, ...items.map(buildRow));
     }
+
     function buildRow(item: KeyValue): HTMLElement {
         const toggle = el('input', {
             class: 'kv-check',
@@ -92,6 +99,7 @@ export function createKvEditor(options: {
             () => {
                 const items = options.items();
                 const index = items.indexOf(item);
+
                 if (index >= 0) {
                     items.splice(index, 1);
                     render();
@@ -108,8 +116,11 @@ export function createKvEditor(options: {
             valueInput,
             remove
         );
+
         return row;
     }
+
     render();
+
     return { root, refresh: render };
 }

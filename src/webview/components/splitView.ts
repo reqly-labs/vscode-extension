@@ -1,21 +1,26 @@
 import { el } from '../dom';
+
 const MIN_FRACTION = 0.2;
 const MAX_FRACTION = 0.8;
 const SIDE_BY_SIDE_QUERY = '(min-width: 1080px)';
 const STORAGE_KEY = 'reqly.split';
+
 function readFraction(): number {
     try {
         const stored = Number(localStorage.getItem(STORAGE_KEY));
+
         return Number.isFinite(stored) && stored > 0 ? stored : 0.5;
     } catch {
         return 0.5;
     }
 }
+
 function writeFraction(value: number): void {
     try {
         localStorage.setItem(STORAGE_KEY, String(value));
     } catch {}
 }
+
 export function createSplitView(first: HTMLElement, second: HTMLElement): HTMLElement {
     let fraction = readFraction();
     const handle = el('div', {
@@ -28,6 +33,7 @@ export function createSplitView(first: HTMLElement, second: HTMLElement): HTMLEl
         root.style.setProperty('--split-a', `${fraction}fr`);
         root.style.setProperty('--split-b', `${1 - fraction}fr`);
     };
+
     apply();
     handle.addEventListener('pointerdown', (event) => {
         event.preventDefault();
@@ -39,6 +45,7 @@ export function createSplitView(first: HTMLElement, second: HTMLElement): HTMLEl
             const offset = horizontal
                 ? (moveEvent.clientX - rect.left) / rect.width
                 : (moveEvent.clientY - rect.top) / rect.height;
+
             fraction = Math.min(MAX_FRACTION, Math.max(MIN_FRACTION, offset));
             apply();
         };
@@ -49,8 +56,10 @@ export function createSplitView(first: HTMLElement, second: HTMLElement): HTMLEl
             handle.removeEventListener('pointerup', stop);
             writeFraction(fraction);
         };
+
         handle.addEventListener('pointermove', move);
         handle.addEventListener('pointerup', stop);
     });
+
     return root;
 }
