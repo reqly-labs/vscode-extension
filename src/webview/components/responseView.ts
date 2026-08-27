@@ -213,6 +213,13 @@ export function createResponseView(): HTMLElement {
         return state.prettyPrint ? prettyPrint(response.body, response.contentType) : response.body;
     }
 
+    function cappedNotice(response: HttpResponse): HTMLElement {
+        return el('p', {
+            class: 'error-detail',
+            text: `The download stopped at ${formatBytes(response.size)}. Raise "Max response size" in the request settings to keep more.`,
+        });
+    }
+
     function renderBody(response: HttpResponse): void {
         if (response.truncated) {
             replace(
@@ -224,7 +231,24 @@ export function createResponseView(): HTMLElement {
                     el('p', {
                         text: `The response is ${formatBytes(response.size)}, too large to preview here.`,
                     }),
-                    el('p', { class: 'error-detail', text: 'Use Save to write it to disk.' })
+                    response.capped
+                        ? cappedNotice(response)
+                        : el('p', { class: 'error-detail', text: 'Use Save to write it to disk.' })
+                )
+            );
+
+            return;
+        }
+
+        if (response.capped) {
+            replace(
+                bodyPane,
+                el(
+                    'div',
+                    { class: 'placeholder' },
+                    icon('alert', 'placeholder-icon'),
+                    el('p', { text: 'The response was larger than the size limit.' }),
+                    cappedNotice(response)
                 )
             );
 

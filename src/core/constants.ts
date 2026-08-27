@@ -9,3 +9,7 @@ export const DEFAULT_TIMEOUT_MS = 30000;
 export const MAX_REDIRECTS = 10;
 
 export const MAX_PREVIEW_BYTES = 5 * 1024 * 1024;
+
+export const DEFAULT_MAX_RESPONSE_BYTES = 50 * 1024 * 1024;
+
+export const MIN_MAX_RESPONSE_BYTES = 64 * 1024;

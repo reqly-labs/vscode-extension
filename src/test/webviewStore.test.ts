@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import type { WebviewState } from '../core/messages';
-import type { RequestSnapshot } from '../core/types';
+import { createSettings, createSnapshot, type RequestSnapshot } from '../core/types';
 import { hydrate, isDirty, persistable, setActive, state } from '../webview/store';
 import { webviewState } from './webviewHarness';
 
@@ -69,6 +69,42 @@ suite('webview store', () => {
         assert.equal(persistable().snapshot.url, 'http://localhost:5208/apartamentos');
         assert.equal(persistable().activeRequestId, 'req-1');
     });
+    test('carries every settings field across a hydration', () => {
+        const settings = createSettings();
+        const custom = Object.fromEntries(
+            Object.entries(settings).map(([key, value]) => [
+                key,
+                typeof value === 'number' ? value + 1 : !value,
+            ])
+        ) as unknown as typeof settings;
+
+        hydrate({ ...webviewState({}), settings: custom });
+
+        for (const key of Object.keys(settings)) {
+            assert.deepEqual(
+                state.settings[key as keyof typeof settings],
+                custom[key as keyof typeof settings],
+                `hydrate dropped the "${key}" setting`
+            );
+        }
+    });
+
+    test('carries every snapshot field across a hydration', () => {
+        const snapshot: RequestSnapshot = {
+            ...createSnapshot(),
+            method: 'PATCH',
+            url: 'https://api.example.com/one',
+            bodyType: 'json',
+            body: '{"a":1}',
+            binaryPath: 'C:/tmp/file.bin',
+            auth: { type: 'bearer', token: 'abc', prefix: 'Token' },
+        };
+
+        hydrate({ ...webviewState({}), snapshot });
+
+        assert.deepEqual(state.snapshot, snapshot);
+    });
+
     test('resets the dirty baseline on hydrate', () => {
         loadRequest({ url: 'https://api.example.com' }, 'req-1');
         assert.equal(isDirty(), false);

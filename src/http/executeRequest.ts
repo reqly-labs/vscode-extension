@@ -2,7 +2,11 @@ import * as http from 'node:http';
 import * as https from 'node:https';
 import type { Duplex } from 'node:stream';
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
-import { MAX_REDIRECTS } from '../core/constants';
+import {
+    DEFAULT_MAX_RESPONSE_BYTES,
+    MAX_REDIRECTS,
+    MIN_MAX_RESPONSE_BYTES,
+} from '../core/constants';
 import type { HttpMethod, RequestSettings, ResponseTimings } from '../core/types';
 import type { WireRequest } from './buildRequest';
 import { trustedContext } from './certificates';
@@ -17,6 +21,7 @@ export class TransportError extends Error {
 }
 
 export interface RawResponse {
+    capped: boolean;
     status: number;
     statusText: string;
     httpVersion: string;
@@ -93,6 +98,7 @@ function headersForRedirect(
 }
 
 interface Exchange {
+    capped: boolean;
     status: number;
     statusText: string;
     httpVersion: string;
@@ -128,22 +134,54 @@ function performExchange(
                 const rawHeaders = collectHeaders(response.rawHeaders);
                 const decoder = decompressor(headerValue(rawHeaders, 'content-encoding'));
                 const stream = decoder ? response.pipe(decoder) : response;
+                const limit = responseLimit(settings);
                 const chunks: Buffer[] = [];
+                let received = 0;
+                let capped = false;
 
-                stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-                stream.on('error', (error: NodeJS.ErrnoException) =>
-                    reject(new TransportError('Failed to read the response body.', error.message))
-                );
-                stream.on('end', () =>
+                const deliver = () =>
                     resolve({
+                        capped,
                         status: response.statusCode ?? 0,
                         statusText: response.statusMessage ?? '',
                         httpVersion: response.httpVersion,
                         headers: rawHeaders,
                         body: Buffer.concat(chunks),
                         timings: durations(marks, performance.now() - start),
-                    })
-                );
+                    });
+
+                stream.on('data', (chunk: Buffer) => {
+                    if (capped) {
+                        return;
+                    }
+
+                    const room = limit - received;
+
+                    if (chunk.byteLength < room) {
+                        chunks.push(chunk);
+                        received += chunk.byteLength;
+
+                        return;
+                    }
+
+                    chunks.push(chunk.subarray(0, room));
+                    received = limit;
+                    capped = true;
+                    request.destroy();
+                    deliver();
+                });
+                stream.on('error', (error: NodeJS.ErrnoException) => {
+                    if (capped) {
+                        return;
+                    }
+
+                    reject(new TransportError('Failed to read the response body.', error.message));
+                });
+                stream.on('end', () => {
+                    if (!capped) {
+                        deliver();
+                    }
+                });
             }
         );
 
@@ -174,6 +212,16 @@ function performExchange(
 
         request.end();
     });
+}
+
+function responseLimit(settings: RequestSettings): number {
+    const limit = Math.floor(settings.maxResponseSize);
+
+    if (!Number.isFinite(limit) || limit < MIN_MAX_RESPONSE_BYTES) {
+        return DEFAULT_MAX_RESPONSE_BYTES;
+    }
+
+    return limit;
 }
 
 function durations(
@@ -279,6 +327,7 @@ export async function executeRequest(
 
         if (!settings.followRedirects || !isRedirect) {
             return {
+                capped: exchange.capped,
                 status: exchange.status,
                 statusText: exchange.statusText,
                 httpVersion: exchange.httpVersion,

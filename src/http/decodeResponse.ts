@@ -55,6 +55,7 @@ export function decodeResponse(raw: RawResponse): HttpResponse {
         contentType,
         redirects: raw.redirects,
         finalUrl: raw.finalUrl,
+        capped: raw.capped,
     };
 
     if (oversized) {

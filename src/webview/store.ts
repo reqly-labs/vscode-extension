@@ -85,9 +85,7 @@ function applySnapshot(target: RequestSnapshot, next: RequestSnapshot): void {
 }
 
 function applySettings(target: RequestSettings, next: RequestSettings): void {
-    target.timeout = next.timeout;
-    target.followRedirects = next.followRedirects;
-    target.rejectUnauthorized = next.rejectUnauthorized;
+    Object.assign(target, next);
 }
 
 export function hydrate(next: WebviewState): void {

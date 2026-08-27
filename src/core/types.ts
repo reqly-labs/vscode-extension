@@ -1,4 +1,10 @@
-import { AUTH_TYPES, BODY_TYPES, DEFAULT_TIMEOUT_MS, HTTP_METHODS } from './constants';
+import {
+    AUTH_TYPES,
+    BODY_TYPES,
+    DEFAULT_MAX_RESPONSE_BYTES,
+    DEFAULT_TIMEOUT_MS,
+    HTTP_METHODS,
+} from './constants';
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
@@ -60,6 +66,7 @@ export interface RequestSettings {
     timeout: number;
     followRedirects: boolean;
     rejectUnauthorized: boolean;
+    maxResponseSize: number;
 }
 
 export interface ResponseTimings {
@@ -83,6 +90,7 @@ export interface HttpResponse {
     previewUri: string | null;
     binary: boolean;
     truncated: boolean;
+    capped: boolean;
     redirects: string[];
     finalUrl: string;
 }
@@ -124,5 +132,6 @@ export function createSettings(): RequestSettings {
         timeout: DEFAULT_TIMEOUT_MS,
         followRedirects: true,
         rejectUnauthorized: true,
+        maxResponseSize: DEFAULT_MAX_RESPONSE_BYTES,
     };
 }

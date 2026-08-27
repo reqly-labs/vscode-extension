@@ -1,4 +1,8 @@
-import { DEFAULT_TIMEOUT_MS } from '../../core/constants';
+import {
+    DEFAULT_MAX_RESPONSE_BYTES,
+    DEFAULT_TIMEOUT_MS,
+    MIN_MAX_RESPONSE_BYTES,
+} from '../../core/constants';
 import { schedulePersist } from '../bridge';
 import { el } from '../dom';
 import { icon } from '../icons';
@@ -32,6 +36,12 @@ function toggleRow(
     return { root, input };
 }
 
+const MEGABYTE = 1024 * 1024;
+
+function toMegabytes(bytes: number): string {
+    return String(Math.max(1, Math.round(bytes / MEGABYTE)));
+}
+
 export function createSettingsMenu(): {
     root: HTMLElement;
 } {
@@ -50,6 +60,25 @@ export function createSettingsMenu(): {
             },
         },
     });
+    const maxResponseSize = el('input', {
+        class: 'field',
+        type: 'number',
+        value: toMegabytes(state.settings.maxResponseSize),
+        attrs: { min: '1', step: '10' },
+        on: {
+            change: (event) => {
+                const parsed = Number((event.target as HTMLInputElement).value) * MEGABYTE;
+
+                state.settings.maxResponseSize =
+                    Number.isFinite(parsed) && parsed >= MIN_MAX_RESPONSE_BYTES
+                        ? parsed
+                        : DEFAULT_MAX_RESPONSE_BYTES;
+                maxResponseSize.value = toMegabytes(state.settings.maxResponseSize);
+                schedulePersist();
+            },
+        },
+    });
+
     const redirects = toggleRow(
         'Follow redirects',
         'Chase 3xx responses automatically.',
@@ -84,6 +113,17 @@ export function createSettingsMenu(): {
                 el('span', { class: 'setting-desc', text: 'Milliseconds before aborting.' })
             ),
             timeout
+        ),
+        el(
+            'label',
+            { class: 'setting-row is-inline' },
+            el(
+                'span',
+                { class: 'setting-text' },
+                el('span', { class: 'setting-label', text: 'Max response size' }),
+                el('span', { class: 'setting-desc', text: 'Megabytes kept in memory.' })
+            ),
+            maxResponseSize
         )
     );
     const trigger = el(
@@ -106,6 +146,7 @@ export function createSettingsMenu(): {
 
     on('settings', () => {
         timeout.value = String(state.settings.timeout);
+        maxResponseSize.value = toMegabytes(state.settings.maxResponseSize);
         redirects.input.checked = state.settings.followRedirects;
         tls.input.checked = state.settings.rejectUnauthorized;
     });
