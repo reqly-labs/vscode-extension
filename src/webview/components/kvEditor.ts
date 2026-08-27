@@ -6,7 +6,7 @@ export interface KvEditorHandle {
     refresh(): void;
 }
 export function createKvEditor(options: {
-    items: KeyValue[];
+    items: () => KeyValue[];
     onStructureChange: () => void;
     onEdit: () => void;
     keyPlaceholder?: string;
@@ -21,7 +21,7 @@ export function createKvEditor(options: {
             type: 'button',
             on: {
                 click: () => {
-                    options.items.push(emptyKeyValue());
+                    options.items().push(emptyKeyValue());
                     render();
                     options.onStructureChange();
                     rows.querySelector<HTMLInputElement>('.kv-row:last-child .kv-key')?.focus();
@@ -38,14 +38,15 @@ export function createKvEditor(options: {
         el('div', { class: 'kv-actions' }, addButton)
     );
     function render(): void {
-        if (options.items.length === 0) {
+        const items = options.items();
+        if (items.length === 0) {
             replace(
                 rows,
                 el('p', { class: 'empty-hint', text: options.emptyLabel ?? 'No entries yet.' })
             );
             return;
         }
-        replace(rows, ...options.items.map(buildRow));
+        replace(rows, ...items.map(buildRow));
     }
     function buildRow(item: KeyValue): HTMLElement {
         const toggle = el('input', {
@@ -89,9 +90,10 @@ export function createKvEditor(options: {
             'trash',
             'Remove entry',
             () => {
-                const index = options.items.indexOf(item);
+                const items = options.items();
+                const index = items.indexOf(item);
                 if (index >= 0) {
-                    options.items.splice(index, 1);
+                    items.splice(index, 1);
                     render();
                     options.onStructureChange();
                 }

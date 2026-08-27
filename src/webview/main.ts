@@ -68,7 +68,7 @@ function mount(mascotUri: string): void {
     emit('response', 'active');
 }
 function remountRequest(): void {
-    emit('method', 'url', 'params', 'headers', 'body', 'auth', 'requestTab', 'active');
+    emit('method', 'url', 'params', 'headers', 'body', 'auth', 'settings', 'requestTab', 'active');
 }
 window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
     const message = event.data;

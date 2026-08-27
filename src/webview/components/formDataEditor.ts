@@ -4,10 +4,10 @@ import { el, replace } from '../dom';
 import { icon, iconButton } from '../icons';
 import { createSelect, type SelectHandle } from './select';
 function fileName(path: string): string {
-    return path.split(/[\\/]/).pop() ?? path;
+    return path.split(/[\/]/).pop() ?? path;
 }
 export function createFormDataEditor(options: {
-    items: FormField[];
+    items: () => FormField[];
     onStructureChange: () => void;
     onEdit: () => void;
 }): {
@@ -24,7 +24,7 @@ export function createFormDataEditor(options: {
             type: 'button',
             on: {
                 click: () => {
-                    options.items.push(emptyFormField());
+                    options.items().push(emptyFormField());
                     render();
                     options.onStructureChange();
                 },
@@ -123,9 +123,10 @@ export function createFormDataEditor(options: {
                 'trash',
                 'Remove field',
                 () => {
-                    const index = options.items.indexOf(item);
+                    const items = options.items();
+                    const index = items.indexOf(item);
                     if (index >= 0) {
-                        options.items.splice(index, 1);
+                        items.splice(index, 1);
                         render();
                         options.onStructureChange();
                     }
@@ -137,11 +138,12 @@ export function createFormDataEditor(options: {
     function render(): void {
         activeSelects.forEach((select) => select.destroy());
         activeSelects = [];
-        if (options.items.length === 0) {
+        const items = options.items();
+        if (items.length === 0) {
             replace(rows, el('p', { class: 'empty-hint', text: 'No form fields yet.' }));
             return;
         }
-        replace(rows, ...options.items.map(buildRow));
+        replace(rows, ...items.map(buildRow));
     }
     render();
     return {

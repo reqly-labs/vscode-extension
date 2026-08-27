@@ -9,10 +9,11 @@ import { applyCurl } from '../curlImport';
 import { createSelect } from './select';
 import { createSettingsMenu } from './settingsMenu';
 export function createUrlBar(options: { onSend: () => void; onCancel: () => void }): HTMLElement {
-    const { snapshot } = state;
-    const shell = el('div', { class: `url-shell method-border-${snapshot.method.toLowerCase()}` });
+    const shell = el('div', {
+        class: `url-shell method-border-${state.snapshot.method.toLowerCase()}`,
+    });
     const methodSelect = createSelect<HttpMethod>({
-        value: snapshot.method,
+        value: state.snapshot.method,
         ariaLabel: 'HTTP method',
         className: 'select-method',
         items: HTTP_METHODS.map((method) => ({
@@ -21,20 +22,20 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
             className: `method-${method.toLowerCase()}`,
         })),
         onChange: (method) => {
-            snapshot.method = method;
+            state.snapshot.method = method;
             shell.className = `url-shell method-border-${method.toLowerCase()}`;
             schedulePersist();
         },
     });
     const urlInput = el('input', {
         class: 'url-input',
-        value: snapshot.url,
+        value: state.snapshot.url,
         spellcheck: false,
         placeholder: 'https://api.example.com/endpoint',
         attrs: { 'aria-label': 'Request URL' },
         on: {
             input: (event) => {
-                snapshot.url = (event.target as HTMLInputElement).value;
+                state.snapshot.url = (event.target as HTMLInputElement).value;
                 schedulePersist();
             },
             keydown: (event) => {

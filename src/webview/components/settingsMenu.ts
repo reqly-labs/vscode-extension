@@ -2,23 +2,24 @@ import { DEFAULT_TIMEOUT_MS } from '../../core/constants';
 import { schedulePersist } from '../bridge';
 import { el } from '../dom';
 import { icon } from '../icons';
-import { state } from '../store';
+import { on, state } from '../store';
 function toggleRow(
     label: string,
     description: string,
     checked: boolean,
     onChange: (value: boolean) => void
-): HTMLElement {
-    return el(
+): { root: HTMLElement; input: HTMLInputElement } {
+    const input = el('input', {
+        type: 'checkbox',
+        checked,
+        on: {
+            change: (event) => onChange((event.target as HTMLInputElement).checked),
+        },
+    });
+    const root = el(
         'label',
         { class: 'setting-row' },
-        el('input', {
-            type: 'checkbox',
-            checked,
-            on: {
-                change: (event) => onChange((event.target as HTMLInputElement).checked),
-            },
-        }),
+        input,
         el(
             'span',
             { class: 'setting-text' },
@@ -26,47 +27,49 @@ function toggleRow(
             el('span', { class: 'setting-desc', text: description })
         )
     );
+    return { root, input };
 }
 export function createSettingsMenu(): {
     root: HTMLElement;
 } {
-    const { settings } = state;
     const timeout = el('input', {
         class: 'field',
         type: 'number',
-        value: String(settings.timeout),
+        value: String(state.settings.timeout),
         attrs: { min: '100', step: '500' },
         on: {
             change: (event) => {
                 const parsed = Number((event.target as HTMLInputElement).value);
-                settings.timeout =
+                state.settings.timeout =
                     Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
                 schedulePersist();
             },
         },
     });
+    const redirects = toggleRow(
+        'Follow redirects',
+        'Chase 3xx responses automatically.',
+        state.settings.followRedirects,
+        (value) => {
+            state.settings.followRedirects = value;
+            schedulePersist();
+        }
+    );
+    const tls = toggleRow(
+        'Verify TLS certificates',
+        'Turn off to allow self-signed certificates.',
+        state.settings.rejectUnauthorized,
+        (value) => {
+            state.settings.rejectUnauthorized = value;
+            schedulePersist();
+        }
+    );
     const panel = el(
         'div',
         { class: 'menu-popup settings-popup' },
         el('p', { class: 'settings-title', text: 'Request settings' }),
-        toggleRow(
-            'Follow redirects',
-            'Chase 3xx responses automatically.',
-            settings.followRedirects,
-            (value) => {
-                settings.followRedirects = value;
-                schedulePersist();
-            }
-        ),
-        toggleRow(
-            'Verify TLS certificates',
-            'Turn off to allow self-signed certificates.',
-            settings.rejectUnauthorized,
-            (value) => {
-                settings.rejectUnauthorized = value;
-                schedulePersist();
-            }
-        ),
+        redirects.root,
+        tls.root,
         el(
             'label',
             { class: 'setting-row is-inline' },
@@ -96,6 +99,11 @@ export function createSettingsMenu(): {
         icon('settings')
     );
     const root = el('div', { class: 'menu settings-menu' }, trigger, panel);
+    on('settings', () => {
+        timeout.value = String(state.settings.timeout);
+        redirects.input.checked = state.settings.followRedirects;
+        tls.input.checked = state.settings.rejectUnauthorized;
+    });
     document.addEventListener('mousedown', (event) => {
         if (!(event.target as HTMLElement | null)?.closest('.settings-menu')) {
             root.classList.remove('is-open');
