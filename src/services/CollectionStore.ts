@@ -16,6 +16,8 @@ export const GLOBAL_FOLDER_NAME = 'collections';
 
 const FILE_SUFFIX = '.json';
 
+const OWNED_PREFIXES = ['collection_', 'request_'];
+
 const MAX_SLUG_LENGTH = 48;
 
 export interface StoreLoad {
@@ -130,7 +132,7 @@ export class CollectionStore {
     watch(): void {
         this.watcher?.dispose();
         this.watcher = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(this.root, `*${FILE_SUFFIX}`)
+            new vscode.RelativePattern(this.root, `{collection_,request_}*${FILE_SUFFIX}`)
         );
 
         const react = (uri: vscode.Uri) => void this.reactTo(uri);
@@ -167,7 +169,10 @@ export class CollectionStore {
             const entries = await vscode.workspace.fs.readDirectory(this.root);
 
             return entries.filter(
-                ([name, type]) => type === vscode.FileType.File && name.endsWith(FILE_SUFFIX)
+                ([name, type]) =>
+                    type === vscode.FileType.File &&
+                    name.endsWith(FILE_SUFFIX) &&
+                    OWNED_PREFIXES.some((prefix) => name.startsWith(prefix))
             );
         } catch {
             return [];

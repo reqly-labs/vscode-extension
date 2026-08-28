@@ -16,5 +16,5 @@
         }
     },
     "include": ["src/test", "src/core", "src/http", "src/services", "src/utils", "src/webview"],
-    "exclude": ["src/webview/main.ts"]
+    "exclude": ["src/webview/main.ts", "src/environments/main.ts", "src/collections/main.ts"]
 }

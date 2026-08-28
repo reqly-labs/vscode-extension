@@ -7,7 +7,7 @@ import { createResponseView } from './components/responseView';
 import { createSplitView } from './components/splitView';
 import { createUrlBar } from './components/urlBar';
 import { el, replace } from './dom';
-import { emit, hydrate, markSaved, setActive, state } from './store';
+import { emit, hydrate, markSaved, setActive, setEnvironment, state } from './store';
 import './styles.css';
 
 const root = document.getElementById('root') as HTMLElement;
@@ -48,6 +48,7 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
 
     switch (message.type) {
         case 'init':
+            state.environment = message.environment;
             hydrate(message.state, message.active);
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
             mount(message.mascotUri);
@@ -63,6 +64,9 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             break;
         case 'activeChanged':
             setActive(message.active);
+            break;
+        case 'environment':
+            setEnvironment(message.environment);
             break;
         case 'saved':
             markSaved();

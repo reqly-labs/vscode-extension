@@ -1,4 +1,5 @@
 import type { HttpResponse, RequestError, RequestSettings, RequestSnapshot } from './types';
+import type { Variable } from './variables';
 
 export interface WebviewState {
     snapshot: RequestSnapshot;
@@ -6,6 +7,13 @@ export interface WebviewState {
     activeRequestTab: string;
     activeResponseTab: string;
     activeRequestId: string | null;
+}
+
+export interface EnvironmentInfo {
+    id: string | null;
+    name: string;
+    names: { id: string; name: string }[];
+    variables: Variable[];
 }
 
 export interface ActiveRequestInfo {
@@ -21,6 +29,7 @@ export type HostMessage =
           mascotUri: string;
           theme: 'light' | 'dark';
           active: ActiveRequestInfo;
+          environment: EnvironmentInfo;
       }
     | {
           type: 'theme';
@@ -34,6 +43,10 @@ export type HostMessage =
     | {
           type: 'activeChanged';
           active: ActiveRequestInfo;
+      }
+    | {
+          type: 'environment';
+          environment: EnvironmentInfo;
       }
     | {
           type: 'saved';
@@ -107,4 +120,11 @@ export type PanelMessage =
           type: 'notify';
           level: 'info' | 'warn' | 'error';
           text: string;
+      }
+    | {
+          type: 'selectEnvironment';
+          id: string | null;
+      }
+    | {
+          type: 'manageEnvironments';
       };

@@ -1,4 +1,4 @@
-import type { ActiveRequestInfo, WebviewState } from '../core/messages';
+import type { ActiveRequestInfo, EnvironmentInfo, WebviewState } from '../core/messages';
 import type { HttpResponse, RequestError, RequestSettings, RequestSnapshot } from '../core/types';
 import { createSettings, createSnapshot } from '../core/types';
 
@@ -10,6 +10,7 @@ export interface AppState extends WebviewState {
     prettyPrint: boolean;
     wrapLines: boolean;
     active: ActiveRequestInfo;
+    environment: EnvironmentInfo;
     baseline: string;
 }
 
@@ -25,6 +26,7 @@ export const CHANNELS = [
     'response',
     'responseTab',
     'active',
+    'environment',
 ] as const;
 
 export type Channel = (typeof CHANNELS)[number];
@@ -46,6 +48,7 @@ export const state: AppState = {
     prettyPrint: true,
     wrapLines: true,
     active: { id: null, name: '', location: '' },
+    environment: { id: null, name: '', names: [], variables: [] },
     baseline: '',
 };
 
@@ -65,6 +68,11 @@ function assignActive(info: ActiveRequestInfo | undefined): void {
 export function setActive(info: ActiveRequestInfo | undefined): void {
     assignActive(info);
     emit('active');
+}
+
+export function setEnvironment(info: EnvironmentInfo): void {
+    state.environment = info;
+    emit('environment', 'url', 'params', 'headers', 'body', 'auth');
 }
 
 export function markSaved(): void {

@@ -2,12 +2,13 @@ import { HTTP_METHODS } from '../../core/constants';
 import { buildCurlCommand } from '../../core/curl';
 import type { HttpMethod } from '../../core/types';
 import { post, schedulePersist } from '../bridge';
+import { applyCurl } from '../curlImport';
 import { el, replace } from '../dom';
 import { icon } from '../icons';
 import { emit, on, state } from '../store';
-import { applyCurl } from '../curlImport';
 import { createSelect } from './select';
 import { createSettingsMenu } from './settingsMenu';
+import { createVariableInput } from './variableInput';
 
 export function createUrlBar(options: { onSend: () => void; onCancel: () => void }): HTMLElement {
     const shell = el('div', {
@@ -28,37 +29,34 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
             schedulePersist();
         },
     });
-    const urlInput = el('input', {
-        class: 'url-input',
+    const url = createVariableInput({
         value: state.snapshot.url,
-        spellcheck: false,
+        className: 'url-input',
         placeholder: 'https://api.example.com/endpoint',
-        attrs: { 'aria-label': 'Request URL' },
-        on: {
-            input: (event) => {
-                state.snapshot.url = (event.target as HTMLInputElement).value;
-                schedulePersist();
-            },
-            keydown: (event) => {
-                if ((event as KeyboardEvent).key === 'Enter') {
-                    event.preventDefault();
-                    options.onSend();
-                }
-            },
-            paste: (event) => {
-                const pasted = (event as ClipboardEvent).clipboardData?.getData('text');
+        ariaLabel: 'Request URL',
+        onInput: (value) => {
+            state.snapshot.url = value;
+            schedulePersist();
+        },
+        onEnter: () => options.onSend(),
+        onPaste: (event) => {
+            const pasted = event.clipboardData?.getData('text');
 
-                if (pasted && applyCurl(pasted)) {
-                    event.preventDefault();
-                    emit();
-                    schedulePersist();
-                    post({ type: 'notify', level: 'info', text: 'cURL command imported.' });
-                }
-            },
+            if (pasted && applyCurl(pasted)) {
+                event.preventDefault();
+                emit();
+                schedulePersist();
+                post({ type: 'notify', level: 'info', text: 'cURL command imported.' });
+
+                return true;
+            }
+
+            return false;
         },
     });
+    const urlInput = url.input;
 
-    shell.append(methodSelect.root, el('div', { class: 'url-divider' }), urlInput);
+    shell.append(methodSelect.root, el('div', { class: 'url-divider' }), url.root);
     const sendLabel = el('span', { text: 'Send' });
     const sendIcon = el('span', { class: 'send-icon' }, icon('send'));
     const sendButton = el(
@@ -75,11 +73,13 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
     );
     const menu = createSendMenu();
     const settings = createSettingsMenu();
+    const environment = createEnvironmentPicker();
     const bar = el(
         'div',
         { class: 'url-bar' },
         shell,
         el('div', { class: 'send-group' }, sendButton, menu.root),
+        environment.root,
         settings.root
     );
 
@@ -91,6 +91,8 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
         if (urlInput.value !== state.snapshot.url) {
             urlInput.value = state.snapshot.url;
         }
+
+        url.refresh();
     });
     on('response', () => {
         sendButton.classList.toggle('is-loading', state.loading);
@@ -165,6 +167,93 @@ function createSendMenu(): {
             root.classList.remove('is-open');
         }
     });
+
+    return { root };
+}
+
+function createEnvironmentPicker(): { root: HTMLElement } {
+    const label = el('span', { class: 'env-pick-label' });
+    const list = el('div', { class: 'menu-list' });
+    const trigger = el(
+        'button',
+        {
+            class: 'env-pick',
+            type: 'button',
+            title: 'Environment used to resolve {{variables}}',
+            attrs: { 'aria-label': 'Environment' },
+            on: {
+                click: (event) => {
+                    event.stopPropagation();
+                    root.classList.toggle('is-open');
+                },
+            },
+        },
+        icon('layers'),
+        label
+    );
+    const root = el(
+        'div',
+        { class: 'menu env-menu' },
+        trigger,
+        el('div', { class: 'menu-popup' }, list)
+    );
+    const choose = (id: string | null) => {
+        root.classList.remove('is-open');
+        post({ type: 'selectEnvironment', id });
+    };
+    const paint = () => {
+        const { environment } = state;
+
+        label.textContent = environment.name || 'No environment';
+        trigger.classList.toggle('is-set', environment.id !== null);
+        replace(
+            list,
+            el(
+                'button',
+                {
+                    class: `menu-item${environment.id === null ? ' is-selected' : ''}`,
+                    type: 'button',
+                    on: { click: () => choose(null) },
+                },
+                'No environment'
+            ),
+            ...environment.names.map((entry) =>
+                el(
+                    'button',
+                    {
+                        class: `menu-item${entry.id === environment.id ? ' is-selected' : ''}`,
+                        type: 'button',
+                        on: { click: () => choose(entry.id) },
+                    },
+                    entry.name
+                )
+            ),
+            el('div', { class: 'menu-divider' }),
+            el(
+                'button',
+                {
+                    class: 'menu-item',
+                    type: 'button',
+                    on: {
+                        click: () => {
+                            root.classList.remove('is-open');
+                            post({ type: 'manageEnvironments' });
+                        },
+                    },
+                },
+                icon('settings'),
+                'Manage environments'
+            )
+        );
+    };
+
+    document.addEventListener('mousedown', (event) => {
+        if (!(event.target as HTMLElement | null)?.closest('.env-menu')) {
+            root.classList.remove('is-open');
+        }
+    });
+    on('environment', paint);
+    paint();
 
     return { root };
 }

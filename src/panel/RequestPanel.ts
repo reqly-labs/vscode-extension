@@ -1,12 +1,20 @@
 import * as vscode from 'vscode';
 import { APP_NAME } from '../brand';
 import { pickContainer } from '../commands/collections';
-import type { ActiveRequestInfo, HostMessage, PanelMessage, WebviewState } from '../core/messages';
+import type {
+    ActiveRequestInfo,
+    EnvironmentInfo,
+    HostMessage,
+    PanelMessage,
+    WebviewState,
+} from '../core/messages';
 import type { RequestSnapshot } from '../core/types';
+import { interpolateSnapshot, unresolvedInSnapshot } from '../core/variables';
 import { ancestorsOf, getRequest, requestLabel } from '../core/workspace';
 import { BuildError, buildRequest } from '../http/buildRequest';
 import { decodeResponse } from '../http/decodeResponse';
 import { executeRequest, TransportError } from '../http/executeRequest';
+import type { EnvironmentService } from '../services/EnvironmentService';
 import type { RequestStateService } from '../services/RequestStateService';
 import type { WorkspaceService } from '../services/WorkspaceService';
 import { renderPanelHtml } from './html';
@@ -14,7 +22,9 @@ import { renderPanelHtml } from './html';
 export interface PanelDependencies {
     store: RequestStateService;
     workspaceService: WorkspaceService;
+    environments: EnvironmentService;
     onActiveChanged?: () => void;
+    onManageEnvironments?: () => void;
 }
 
 export class RequestPanel {
@@ -93,6 +103,10 @@ export class RequestPanel {
         return RequestPanel.current?.activeRequestId ?? null;
     }
 
+    static notifyEnvironment(): void {
+        RequestPanel.current?.sendEnvironment();
+    }
+
     async openRequest(id: string): Promise<void> {
         const node = getRequest(this.deps.workspaceService.workspace, id);
 
@@ -149,6 +163,24 @@ export class RequestPanel {
         return getRequest(this.deps.workspaceService.workspace, id) ? id : null;
     }
 
+    describeEnvironment(): EnvironmentInfo {
+        const { environments } = this.deps;
+        const active = environments.active;
+
+        return {
+            id: active?.id ?? null,
+            name: active?.name ?? '',
+            names: environments.environments.map((entry) => ({ id: entry.id, name: entry.name })),
+            variables: active?.variables ?? [],
+        };
+    }
+
+    sendEnvironment(): void {
+        if (this.ready) {
+            this.send({ type: 'environment', environment: this.describeEnvironment() });
+        }
+    }
+
     private describeActive(): ActiveRequestInfo {
         const { workspace } = this.deps.workspaceService;
         const node = this.activeRequestId ? getRequest(workspace, this.activeRequestId) : undefined;
@@ -195,6 +227,7 @@ export class RequestPanel {
                     },
                     theme: this.themeKind(),
                     active: this.describeActive(),
+                    environment: this.describeEnvironment(),
                     mascotUri: this.panel.webview
                         .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'mascot.png'))
                         .toString(),
@@ -236,6 +269,12 @@ export class RequestPanel {
                 break;
             case 'notify':
                 this.notify(message.level, message.text);
+                break;
+            case 'selectEnvironment':
+                await this.deps.environments.setActive(message.id);
+                break;
+            case 'manageEnvironments':
+                this.deps.onManageEnvironments?.();
                 break;
         }
     }
@@ -336,7 +375,17 @@ export class RequestPanel {
 
         this.inFlight = controller;
         try {
-            const wire = await buildRequest(message.snapshot);
+            const values = this.deps.environments.values;
+            const missing = unresolvedInSnapshot(message.snapshot, values);
+
+            if (missing.length > 0) {
+                this.notify(
+                    'warn',
+                    `No value for ${missing.map((name) => `{{${name}}}`).join(', ')}. The request was sent with the text as written.`
+                );
+            }
+
+            const wire = await buildRequest(interpolateSnapshot(message.snapshot, values));
             const raw = await executeRequest(wire, message.settings, controller.signal);
 
             if (controller.signal.aborted) {

@@ -73,6 +73,18 @@
                 "title": "Save Request",
                 "category": "Reqly",
                 "icon": "$(save)"
+            },
+            {
+                "command": "reqly.manageEnvironments",
+                "title": "Manage Environments",
+                "category": "Reqly",
+                "icon": "$(symbol-variable)"
+            },
+            {
+                "command": "reqly.selectEnvironment",
+                "title": "Select Environment",
+                "category": "Reqly",
+                "icon": "$(list-selection)"
             }
         ],
         "viewsContainers": {

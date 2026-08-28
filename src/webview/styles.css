@@ -1346,3 +1346,139 @@ code {
         transform: rotate(360deg);
     }
 }
+
+.variable-input {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+}
+
+.variable-backdrop,
+.variable-field {
+    font: inherit;
+    letter-spacing: inherit;
+    white-space: pre;
+    width: 100%;
+}
+
+.variable-backdrop {
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-text);
+}
+
+.variable-field {
+    background: transparent;
+    caret-color: var(--color-text);
+    color: transparent;
+    position: relative;
+}
+
+.variable-field::selection {
+    background: color-mix(in srgb, var(--color-primary) 35%, transparent);
+    color: transparent;
+}
+
+.variable-token {
+    color: var(--color-success);
+    font-weight: 600;
+}
+
+.variable-popup {
+    background: var(--color-popover, var(--color-surface));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 6px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+    display: none;
+    left: 0;
+    max-height: 220px;
+    min-width: 220px;
+    overflow-y: auto;
+    padding: 4px;
+    position: absolute;
+    top: calc(100% + 4px);
+    z-index: 60;
+}
+
+.variable-input.is-open .variable-popup {
+    display: block;
+}
+
+.variable-option {
+    align-items: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm, 4px);
+    color: var(--color-text);
+    cursor: pointer;
+    display: flex;
+    font-family: inherit;
+    font-size: 11px;
+    gap: 12px;
+    justify-content: space-between;
+    padding: 5px 8px;
+    text-align: left;
+    width: 100%;
+}
+
+.variable-option.is-active {
+    background: var(--color-surface-hover, var(--color-border));
+}
+
+.variable-option-key {
+    color: var(--color-success);
+    font-family: var(--font-mono, monospace);
+    font-weight: 600;
+}
+
+.variable-option-value {
+    color: var(--color-text-subtle);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.env-menu .env-pick {
+    align-items: center;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 6px);
+    color: var(--color-text-subtle);
+    cursor: pointer;
+    display: flex;
+    gap: 6px;
+    font-family: inherit;
+    font-size: 11px;
+    max-width: 170px;
+    padding: 0 10px;
+    height: 34px;
+}
+
+.env-menu .env-pick.is-set {
+    color: var(--color-text);
+}
+
+.env-menu .env-pick.is-set svg {
+    color: var(--color-success);
+}
+
+.env-pick-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.menu-divider {
+    background: var(--color-border);
+    height: 1px;
+    margin: 4px 0;
+}
+
+.menu-item.is-selected {
+    color: var(--color-success);
+}

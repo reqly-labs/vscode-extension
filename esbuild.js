@@ -74,6 +74,14 @@ const targets = [
         platform: 'browser',
         target: ['chrome120'],
     },
+    {
+        ...shared,
+        entryPoints: ['src/environments/main.ts'],
+        outfile: 'dist/environments.js',
+        format: 'iife',
+        platform: 'browser',
+        target: ['chrome120'],
+    },
 ];
 
 async function main() {

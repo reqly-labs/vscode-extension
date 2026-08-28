@@ -1,6 +1,7 @@
 import { emptyKeyValue, type KeyValue } from '../../core/types';
 import { el, replace } from '../dom';
 import { icon, iconButton } from '../icons';
+import { createVariableInput } from './variableInput';
 
 export interface KvEditorHandle {
     root: HTMLElement;
@@ -69,28 +70,24 @@ export function createKvEditor(options: {
                 },
             },
         });
-        const keyInput = el('input', {
-            class: 'field kv-key',
+        const keyInput = createVariableInput({
             value: item.key,
-            spellcheck: false,
+            className: 'field kv-key',
             placeholder: options.keyPlaceholder ?? 'Key',
-            on: {
-                input: (event) => {
-                    item.key = (event.target as HTMLInputElement).value;
-                    options.onEdit();
-                },
+            ariaLabel: options.keyPlaceholder ?? 'Key',
+            onInput: (value) => {
+                item.key = value;
+                options.onEdit();
             },
         });
-        const valueInput = el('input', {
-            class: 'field kv-value',
+        const valueInput = createVariableInput({
             value: item.value,
-            spellcheck: false,
+            className: 'field kv-value',
             placeholder: options.valuePlaceholder ?? 'Value',
-            on: {
-                input: (event) => {
-                    item.value = (event.target as HTMLInputElement).value;
-                    options.onEdit();
-                },
+            ariaLabel: options.valuePlaceholder ?? 'Value',
+            onInput: (value) => {
+                item.value = value;
+                options.onEdit();
             },
         });
         const remove = iconButton(
@@ -112,8 +109,8 @@ export function createKvEditor(options: {
             'div',
             { class: `kv-row${item.enabled ? '' : ' is-disabled'}` },
             toggle,
-            keyInput,
-            valueInput,
+            keyInput.root,
+            valueInput.root,
             remove
         );
 

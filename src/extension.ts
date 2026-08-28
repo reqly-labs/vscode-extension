@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 import { readCertificateFiles, useAdditionalCertificates } from './http/certificates';
+import { EnvironmentPanel } from './panel/EnvironmentPanel';
 import { RequestPanel, type PanelDependencies } from './panel/RequestPanel';
 import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
 import { CollectionStore } from './services/CollectionStore';
+import { EnvironmentService } from './services/EnvironmentService';
+import { EnvironmentStore } from './services/EnvironmentStore';
 import { migrateLegacyWorkspace } from './services/legacyMigration';
 import { RequestStateService } from './services/RequestStateService';
 import { SecretStore } from './services/SecretStore';
@@ -24,7 +27,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
     );
 
+    const environmentStore = new EnvironmentStore(root);
+    const environments = await EnvironmentService.open(
+        environmentStore,
+        context.workspaceState,
+        secrets
+    );
+
     collections.watch();
+    environmentStore.watch();
     const collectionsView = new CollectionsViewProvider(
         context.extensionUri,
         workspaceService,
@@ -39,7 +50,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const deps: PanelDependencies = {
         store,
         workspaceService,
+        environments,
         onActiveChanged: () => collectionsView.refresh(),
+        onManageEnvironments: () => EnvironmentPanel.show(context, environments),
     };
 
     context.subscriptions.push(
@@ -50,6 +63,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ),
         workspaceService,
         collections,
+        environments,
+        environmentStore,
+        environments.onDidChange(() => RequestPanel.notifyEnvironment()),
+        environmentStore.onDidChangeExternally(() => {
+            background('reload environments from disk', environments.reload());
+        }),
+        environments.onSecretsUnavailable(() => {
+            void vscode.window.showWarningMessage(
+                'Reqly could not reach the credential store, so the secret variable was not saved.'
+            );
+        }),
         workspaceService.onDidChange(() => collectionsView.refresh()),
         collections.onDidChangeExternally(() => {
             background('reload collections from disk', workspaceService.reload());
@@ -73,6 +97,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }),
         vscode.commands.registerCommand('reqly.saveRequest', () => {
             RequestPanel.show(context, deps).triggerSave();
+        }),
+        vscode.commands.registerCommand('reqly.manageEnvironments', () => {
+            EnvironmentPanel.show(context, environments);
+        }),
+        vscode.commands.registerCommand('reqly.selectEnvironment', async () => {
+            await pickEnvironment(environments);
         })
     );
     background('move credentials into the keychain', store.migrate());
@@ -108,6 +138,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         void vscode.window.showInformationMessage(
             `Reqly moved ${migration.collections} collection(s) and ${migration.requests} request(s) into files in ${where}.`
         );
+    }
+}
+
+async function pickEnvironment(environments: EnvironmentService): Promise<void> {
+    const none = { label: 'No environment', id: null as string | null };
+    const items = [
+        none,
+        ...environments.environments.map((entry) => ({ label: entry.name, id: entry.id })),
+    ].map((item) => ({
+        ...item,
+        description: item.id === environments.activeId ? 'active' : undefined,
+    }));
+    const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Choose the environment to resolve {{variables}} with',
+    });
+
+    if (picked) {
+        await environments.setActive(picked.id);
     }
 }
 

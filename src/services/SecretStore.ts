@@ -1,6 +1,8 @@
 const WORKSPACE_KEY = 'reqly.secrets';
 const DRAFT_KEY = 'reqly.draftSecret';
 
+const ENVIRONMENT_KEY = 'reqly.environmentSecrets';
+
 export interface SecretStorageLike {
     get(key: string): Thenable<string | undefined>;
     store(key: string, value: string): Thenable<void>;
@@ -41,6 +43,30 @@ export class SecretStore {
         return this.set(WORKSPACE_KEY, JSON.stringify(secrets));
     }
 
+    async readEnvironments(): Promise<Record<string, string>> {
+        const raw = await this.get(ENVIRONMENT_KEY);
+
+        if (!raw) {
+            return {};
+        }
+
+        try {
+            const parsed: unknown = JSON.parse(raw);
+
+            return isRecordOfStrings(parsed) ? parsed : {};
+        } catch {
+            return {};
+        }
+    }
+
+    async writeEnvironments(secrets: Record<string, string>): Promise<boolean> {
+        if (Object.keys(secrets).length === 0) {
+            return this.remove(ENVIRONMENT_KEY);
+        }
+
+        return this.set(ENVIRONMENT_KEY, JSON.stringify(secrets));
+    }
+
     async readDraft(): Promise<string> {
         return (await this.get(DRAFT_KEY)) ?? '';
     }
@@ -56,6 +82,7 @@ export class SecretStore {
     async clear(): Promise<void> {
         await this.remove(WORKSPACE_KEY);
         await this.remove(DRAFT_KEY);
+        await this.remove(ENVIRONMENT_KEY);
     }
 
     private async get(key: string): Promise<string | undefined> {
