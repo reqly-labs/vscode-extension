@@ -94,7 +94,6 @@ export class RequestPanel {
     }
 
     async openRequest(id: string): Promise<void> {
-        await this.deps.workspaceService.restoreSecrets();
         const node = getRequest(this.deps.workspaceService.workspace, id);
 
         if (!node) {

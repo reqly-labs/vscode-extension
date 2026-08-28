@@ -30,6 +30,17 @@ away in the next, and nothing about your request ever leaves your machine.
 
 ## Features
 
+### Collections you can read, diff and commit
+
+A collection is one JSON file. Renaming it renames the file; deleting it deletes the file. Saving a
+request rewrites that collection's file and nothing else, so a library of hundreds of requests stays
+quick to open and quiet in a diff.
+
+Point `reqly.storage.location` at `workspace` and the files land in a `.reqly` folder in the project,
+where they can be reviewed in a pull request and travel with the repository. Edit one by hand, pull a
+change, switch branches: the sidebar follows the files. Credentials never go in them — those live in
+the operating system keychain, so a collection file is safe to commit.
+
 ### Collections that keep their shape
 
 The Reqly panel in the Activity Bar holds your whole workspace: collections at the top level, folders
@@ -134,8 +145,8 @@ mid-flight with the same button that sent them.
 
 Every color comes from the [Reqly design system](https://github.com/reqly-labs/design-system) and
 follows your editor between light and dark themes, live, with no configuration. Nothing is lost on a
-reload: collections follow you across every window, and the request you were editing, saved or not,
-comes back exactly as you left it in that workspace.
+reload: collections come back from their files, and the request you were editing, saved or not, comes
+back exactly as you left it in that workspace.
 
 ## Getting started
 
@@ -236,11 +247,16 @@ Request options — timeout, redirect following, TLS verification, maximum respo
 the request itself, behind the gear icon next to the send button, so two workspaces can disagree
 without fighting over a global setting.
 
-One setting lives in `settings.json`, because it describes the machine rather than the request:
+Two settings live in `settings.json`, because they describe the machine and the project rather than
+the request:
 
-| Setting                      | Type       | Default | Description                                                                                                |
-| ---------------------------- | ---------- | ------- | ---------------------------------------------------------------------------------------------------------- |
-| `reqly.certificateAuthority` | `string[]` | `[]`    | Paths to extra PEM certificate authorities to trust, for a root that is not installed in the system store. |
+| Setting                      | Type       | Default    | Description                                                                                                          |
+| ---------------------------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| `reqly.storage.location`     | `string`   | `"global"` | Where collection files are kept: `global` for Reqly's own storage, `workspace` for a `.reqly` folder in the project. |
+| `reqly.certificateAuthority` | `string[]` | `[]`       | Paths to extra PEM certificate authorities to trust, for a root that is not installed in the system store.           |
+
+Changing `reqly.storage.location` needs a window reload, and existing files are not moved for you.
+With no folder open, `workspace` falls back to global storage.
 
 Requests go out through the editor's own HTTP stack, so VS Code's `http.proxy` setting and the
 standard proxy environment variables apply, following whatever `http.proxySupport` is set to.

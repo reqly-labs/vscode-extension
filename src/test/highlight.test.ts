@@ -80,7 +80,7 @@ suite('highlight preserves the text it is given', () => {
         ['{ malformed json, "still": text }', 'json'],
         ['', 'json'],
         ['<root attr="1"><child/></root>', 'xml'],
-        ['<!-- comment --><a b=\'c\'>text</a>', 'xml'],
+        ["<!-- comment --><a b='c'>text</a>", 'xml'],
         ['plain text with < and & inside', 'text'],
         ['{"unicode":"café ✓ 🦆"}', 'json'],
     ];

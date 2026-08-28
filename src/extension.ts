@@ -2,14 +2,29 @@ import * as vscode from 'vscode';
 import { readCertificateFiles, useAdditionalCertificates } from './http/certificates';
 import { RequestPanel, type PanelDependencies } from './panel/RequestPanel';
 import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
+import { CollectionStore } from './services/CollectionStore';
+import { migrateLegacyWorkspace } from './services/legacyMigration';
 import { RequestStateService } from './services/RequestStateService';
 import { SecretStore } from './services/SecretStore';
+import { resolveStorageRoot } from './services/storageLocation';
 import { WorkspaceService } from './services/WorkspaceService';
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const secrets = new SecretStore(context.secrets);
     const store = new RequestStateService(context.workspaceState, secrets);
-    const workspaceService = new WorkspaceService(context.globalState, secrets);
+    const { root, location } = resolveStorageRoot(context);
+    const collections = new CollectionStore(root);
+    const workspaceService = await WorkspaceService.open(collections, secrets);
+    const migration = await migrateLegacyWorkspace(
+        context.globalState,
+        workspaceService.workspace,
+        async (legacy) => {
+            await collections.save(legacy);
+            await workspaceService.reload();
+        }
+    );
+
+    collections.watch();
     const collectionsView = new CollectionsViewProvider(
         context.extensionUri,
         workspaceService,
@@ -34,7 +49,16 @@ export function activate(context: vscode.ExtensionContext): void {
             { webviewOptions: { retainContextWhenHidden: true } }
         ),
         workspaceService,
+        collections,
         workspaceService.onDidChange(() => collectionsView.refresh()),
+        collections.onDidChangeExternally(() => {
+            background('reload collections from disk', workspaceService.reload());
+        }),
+        workspaceService.onSecretsUnavailable(() => {
+            void vscode.window.showWarningMessage(
+                'Reqly could not reach the credential store, so the credential was not saved. The rest of the request was.'
+            );
+        }),
         vscode.commands.registerCommand('reqly.newRequest', async () => {
             await collectionsView.createRequest(null);
         }),
@@ -51,7 +75,6 @@ export function activate(context: vscode.ExtensionContext): void {
             RequestPanel.show(context, deps).triggerSave();
         })
     );
-    background('restore saved credentials', workspaceService.restoreSecrets());
     background('move credentials into the keychain', store.migrate());
     background('load certificate authorities', loadCertificateAuthorities());
     context.subscriptions.push(
@@ -61,8 +84,42 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         })
     );
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration('reqly.storage.location')) {
+                void promptStorageReload();
+            }
+        })
+    );
+
     if (workspaceService.loadRepairs.length > 0) {
         background('report workspace repairs', reportRepairs(workspaceService.loadRepairs));
+    }
+
+    if (workspaceService.unreadableFiles.length > 0) {
+        void vscode.window.showWarningMessage(
+            `Reqly skipped ${workspaceService.unreadableFiles.length} unreadable collection file(s): ${workspaceService.unreadableFiles.join(', ')}`
+        );
+    }
+
+    if (migration.moved) {
+        const where = location === 'workspace' ? 'this workspace' : 'Reqly global storage';
+
+        void vscode.window.showInformationMessage(
+            `Reqly moved ${migration.collections} collection(s) and ${migration.requests} request(s) into files in ${where}.`
+        );
+    }
+}
+
+async function promptStorageReload(): Promise<void> {
+    const reload = 'Reload Window';
+    const answer = await vscode.window.showInformationMessage(
+        'Reqly collection storage changed. Reload the window to read from the new location.',
+        reload
+    );
+
+    if (answer === reload) {
+        await vscode.commands.executeCommand('workbench.action.reloadWindow');
     }
 }
 

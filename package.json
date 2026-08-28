@@ -3,7 +3,7 @@
     "publisher": "arturbomtempo-dev",
     "displayName": "Reqly for VS Code",
     "description": "A modern, lightweight HTTP client that brings the Reqly experience directly into VS Code.",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "icon": "media/icon.png",
     "license": "MIT",
     "author": {
@@ -125,6 +125,19 @@
                     },
                     "default": [],
                     "markdownDescription": "Paths to additional CA certificate files (PEM) to trust when verifying TLS. Use this when the issuing authority is not installed in the operating system certificate store."
+                },
+                "reqly.storage.location": {
+                    "type": "string",
+                    "enum": [
+                        "global",
+                        "workspace"
+                    ],
+                    "enumDescriptions": [
+                        "Keep collections in Reqly's global storage, available in every window.",
+                        "Keep collections in a .reqly folder inside the workspace, so they can be committed with the project."
+                    ],
+                    "default": "global",
+                    "markdownDescription": "Where collection files are kept. Changing this needs a window reload; existing files are not moved for you."
                 }
             }
         }

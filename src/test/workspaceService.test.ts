@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict';
 import { createSnapshot } from '../core/types';
 import { childIdsOf, getGroup, getRequest, parentOf } from '../core/workspace';
 import { WorkspaceService, type WorkspaceChange } from '../services/WorkspaceService';
-import { FakeMemento } from './FakeMemento';
+import { FakePersistence } from './FakePersistence';
 
 function expectId(result: { ok: boolean; id?: string; reason?: string }): string {
     assert.ok(result.ok, `expected success, got: ${result.reason}`);
@@ -12,8 +12,8 @@ function expectId(result: { ok: boolean; id?: string; reason?: string }): string
 
 suite('WorkspaceService persistence', () => {
     test('a tree built in one session is intact in the next', async () => {
-        const memento = new FakeMemento();
-        const first = new WorkspaceService(memento);
+        const files = new FakePersistence();
+        const first = await WorkspaceService.open(files);
         const collectionId = expectId(await first.createCollection('Billing'));
         const folderId = expectId(await first.createFolder(collectionId, 'v2'));
         const requestId = expectId(
@@ -24,7 +24,7 @@ suite('WorkspaceService persistence', () => {
             })
         );
         const looseId = expectId(await first.createRequest(null, 'Health check'));
-        const second = new WorkspaceService(memento);
+        const second = await WorkspaceService.open(files);
 
         assert.deepEqual(second.loadRepairs, []);
         assert.equal(getGroup(second.workspace, collectionId)?.name, 'Billing');
@@ -37,24 +37,27 @@ suite('WorkspaceService persistence', () => {
         assert.equal(restored?.snapshot.url, 'https://api.test.dev/invoices');
     });
     test('nothing is written until a mutation succeeds', async () => {
-        const memento = new FakeMemento();
-        const service = new WorkspaceService(memento);
+        const files = new FakePersistence();
+        const service = await WorkspaceService.open(files);
         const rejected = await service.createFolder('not-a-real-id', 'Nope');
 
         assert.equal(rejected.ok, false);
-        assert.deepEqual(new WorkspaceService(memento).workspace.rootIds, []);
+        assert.deepEqual((await WorkspaceService.open(files)).workspace.rootIds, []);
     });
     test('a rename survives the round trip', async () => {
-        const memento = new FakeMemento();
-        const service = new WorkspaceService(memento);
+        const files = new FakePersistence();
+        const service = await WorkspaceService.open(files);
         const id = expectId(await service.createCollection('Old name'));
 
         await service.rename(id, 'New name');
-        assert.equal(getGroup(new WorkspaceService(memento).workspace, id)?.name, 'New name');
+        assert.equal(
+            getGroup((await WorkspaceService.open(files)).workspace, id)?.name,
+            'New name'
+        );
     });
     test('deleting reports every id it removed so listeners can unlink', async () => {
-        const memento = new FakeMemento();
-        const service = new WorkspaceService(memento);
+        const files = new FakePersistence();
+        const service = await WorkspaceService.open(files);
         const collectionId = expectId(await service.createCollection('API'));
         const requestId = expectId(await service.createRequest(collectionId, 'Child'));
         const changes: WorkspaceChange[] = [];
@@ -63,11 +66,11 @@ suite('WorkspaceService persistence', () => {
         await service.remove(collectionId);
         assert.equal(changes.length, 1);
         assert.deepEqual([...changes[0].removedIds].sort(), [collectionId, requestId].sort());
-        assert.deepEqual(new WorkspaceService(memento).workspace.rootIds, []);
+        assert.deepEqual((await WorkspaceService.open(files)).workspace.rootIds, []);
     });
     test('a change event fires once per successful mutation and never on failure', async () => {
-        const memento = new FakeMemento();
-        const service = new WorkspaceService(memento);
+        const files = new FakePersistence();
+        const service = await WorkspaceService.open(files);
         const id = expectId(await service.createCollection('API'));
         let fired = 0;
 
@@ -80,7 +83,7 @@ suite('WorkspaceService persistence', () => {
         assert.equal(fired, 1, 'a missing node must not announce a change');
     });
     test('unsubscribing stops delivery', async () => {
-        const service = new WorkspaceService(new FakeMemento());
+        const service = await WorkspaceService.open(new FakePersistence());
         let fired = 0;
         const subscription = service.onDidChange(() => (fired += 1));
 
@@ -90,49 +93,56 @@ suite('WorkspaceService persistence', () => {
         assert.equal(fired, 1);
     });
     test('a corrupted store is repaired rather than lost', async () => {
-        const memento = new FakeMemento();
+        const files = new FakePersistence();
 
-        await memento.update('reqly.workspace', {
-            nodes: {
-                c1: { kind: 'collection', name: 'API', childIds: ['r1', 'missing'] },
-                r1: { kind: 'request', name: 'Kept' },
-                orphan: { kind: 'request', name: 'Stranded' },
+        files.seedRaw('broken', {
+            reqly: 1,
+            order: 0,
+            node: {
+                id: 'f1',
+                kind: 'folder',
+                name: 'Loose folder',
+                children: [{ id: 'r1', kind: 'request', name: 'Kept' }],
             },
-            rootIds: ['c1'],
         });
-        const service = new WorkspaceService(memento);
+        files.corrupt('unreadable');
 
-        assert.ok(service.loadRepairs.length > 0);
-        assert.deepEqual(childIdsOf(service.workspace, 'c1'), ['r1']);
-        assert.ok(service.workspace.rootIds.includes('orphan'));
+        const service = await WorkspaceService.open(files);
+
+        assert.ok(service.loadRepairs.length > 0, 'a folder at the root should be repaired');
+        assert.equal(service.workspace.nodes.f1?.kind, 'collection');
+        assert.deepEqual(childIdsOf(service.workspace, 'f1'), ['r1']);
     });
     test('moving a request keeps exactly one parent after a reload', async () => {
-        const memento = new FakeMemento();
-        const service = new WorkspaceService(memento);
+        const files = new FakePersistence();
+        const service = await WorkspaceService.open(files);
         const from = expectId(await service.createCollection('From'));
         const to = expectId(await service.createCollection('To'));
         const requestId = expectId(await service.createRequest(from, 'Movable'));
 
         await service.move(requestId, to);
-        const reloaded = new WorkspaceService(memento).workspace;
+        const reloaded = (await WorkspaceService.open(files)).workspace;
 
         assert.deepEqual(childIdsOf(reloaded, from), []);
         assert.deepEqual(childIdsOf(reloaded, to), [requestId]);
         assert.deepEqual(reloaded.rootIds, [from, to]);
     });
     test('clearing wipes the tree and the stored copy together', async () => {
-        const memento = new FakeMemento();
-        const service = new WorkspaceService(memento);
+        const files = new FakePersistence();
+        const service = await WorkspaceService.open(files);
 
         await service.createCollection('Doomed');
         await service.clear();
         assert.deepEqual(service.workspace, { nodes: {}, rootIds: [] });
-        assert.deepEqual(new WorkspaceService(memento).workspace, { nodes: {}, rootIds: [] });
+        assert.deepEqual((await WorkspaceService.open(files)).workspace, {
+            nodes: {},
+            rootIds: [],
+        });
     });
 });
 suite('WorkspaceService reference integrity', () => {
     test('renaming one request never touches an identically named sibling', async () => {
-        const service = new WorkspaceService(new FakeMemento());
+        const service = await WorkspaceService.open(new FakePersistence());
         const collectionId = expectId(await service.createCollection('API'));
         const first = expectId(await service.createRequest(collectionId, 'Duplicate name'));
         const second = expectId(await service.createRequest(collectionId, 'Duplicate name'));
@@ -142,7 +152,7 @@ suite('WorkspaceService reference integrity', () => {
         assert.equal(getRequest(service.workspace, second)?.name, 'Renamed');
     });
     test('saving into a moved request still lands on that request', async () => {
-        const service = new WorkspaceService(new FakeMemento());
+        const service = await WorkspaceService.open(new FakePersistence());
         const from = expectId(await service.createCollection('From'));
         const to = expectId(await service.createCollection('To'));
         const requestId = expectId(await service.createRequest(from, 'Target'));
@@ -153,7 +163,7 @@ suite('WorkspaceService reference integrity', () => {
         assert.equal(parentOf(service.workspace, requestId), to);
     });
     test('every generated id is unique across a large tree', async () => {
-        const service = new WorkspaceService(new FakeMemento());
+        const service = await WorkspaceService.open(new FakePersistence());
         const collectionId = expectId(await service.createCollection('Bulk'));
 
         for (let index = 0; index < 200; index += 1) {

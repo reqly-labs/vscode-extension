@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-28
+
+Collections are files now. They used to live in a single opaque blob inside VS Code's global state;
+they are plain JSON documents you can read, diff, review and commit.
+
+### Changed
+
+- **Collections are stored as one JSON file per collection** instead of a single state blob. Saving
+  one request rewrites one file, not the whole library, and a collection is a readable document
+  rather than an entry in a database only VS Code can open.
+- Collections written by 1.2.0 are moved into files automatically on first start, and the old state
+  key is cleared. Nothing to do by hand; a message says how much was moved and where it went.
+- Renaming a collection renames its file. Deleting one deletes its file.
+- A file Reqly cannot parse is skipped and named, instead of taking the rest of the library with it.
+  The healthy collections still load.
+- A credential is never written to a collection file, even when the keychain is unavailable. Files
+  can be committed, so an unreachable keychain now means the credential is not saved and you are
+  told, rather than the credential being written in the clear.
+- A credential found sitting in a collection file — hand-edited in, or pulled from a branch — is
+  swept into the keychain and erased from the file on load.
+
+### Added
+
+- `reqly.storage.location`: keep collections in Reqly's global storage (the default, available in
+  every window) or in a `.reqly` folder inside the workspace, so they travel with the project and
+  can be committed.
+- Collections are reloaded when their files change on disk, so switching branches or pulling a
+  change updates the sidebar without a restart.
+
+### Fixed
+
+- The Content-Security-Policy nonce for both webviews is generated with a cryptographic random
+  source. It used `Math.random()`, which is predictable and unfit for a security token.
+- Work started during activation no longer fails silently. A credential restore, a keychain
+  migration or a certificate load that fails now says so instead of becoming an unhandled rejection.
+
 ## [1.2.0] - 2026-08-28
 
 A bug fix release. Requests that looked ready refused to send, TLS verification ignored the machine's
@@ -129,7 +165,8 @@ that `localhost` services, self-signed certificates and arbitrary headers all wo
   editor themes.
 - `Ctrl+Alt+Enter` / `Cmd+Alt+Enter` keybinding to send the current request from anywhere in VS Code.
 
-[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.2.0...HEAD
+[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.3.0
 [1.2.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.2.0
 [1.1.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.1.0
 [1.0.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.0.0

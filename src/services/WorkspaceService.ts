@@ -14,62 +14,84 @@ import {
     type Workspace,
     type WorkspaceResult,
 } from '../core/workspace';
-import { normalizeWorkspace } from '../core/workspaceIntegrity';
 import { Emitter } from '../utils/Emitter';
 import type { SecretStore } from './SecretStore';
-
-const STORAGE_KEY = 'reqly.workspace';
 
 export interface WorkspaceChange {
     removedIds: string[];
 }
 
-export interface WorkspaceStorage {
-    get<T>(key: string): T | undefined;
-    update(key: string, value: unknown): PromiseLike<void>;
+export interface WorkspaceLoad {
+    workspace: Workspace;
+    repairs: string[];
+    unreadable: string[];
+}
+
+export interface WorkspacePersistence {
+    load(): Promise<WorkspaceLoad>;
+    save(workspace: Workspace): Promise<void>;
 }
 
 export class WorkspaceService {
-    private state: Workspace;
-    private restored: Promise<void> | undefined;
+    private state: Workspace = createWorkspace();
     private readonly changeEmitter = new Emitter<WorkspaceChange>();
+    private readonly secretFailureEmitter = new Emitter<void>();
+
     readonly onDidChange = this.changeEmitter.event;
-    readonly loadRepairs: string[];
+    readonly onSecretsUnavailable = this.secretFailureEmitter.event;
+
+    loadRepairs: string[] = [];
+    unreadableFiles: string[] = [];
+
     constructor(
-        private readonly memento: WorkspaceStorage,
+        private readonly persistence: WorkspacePersistence,
         private readonly secrets?: SecretStore
-    ) {
-        const { workspace, repairs } = normalizeWorkspace(memento.get(STORAGE_KEY));
+    ) {}
 
-        this.state = workspace;
-        this.loadRepairs = repairs;
-    }
+    static async open(
+        persistence: WorkspacePersistence,
+        secrets?: SecretStore
+    ): Promise<WorkspaceService> {
+        const service = new WorkspaceService(persistence, secrets);
 
-    async restoreSecrets(): Promise<void> {
-        this.restored ??= this.loadSecrets();
-        await this.restored;
-    }
+        await service.reload();
 
-    private async loadSecrets(): Promise<void> {
-        if (!this.secrets) {
-            return;
-        }
-
-        const legacy = collectSecrets(this.state);
-        const vault = await this.secrets.readWorkspace();
-
-        this.state = restoreWorkspace(this.state, { ...legacy, ...vault });
-        if (Object.keys(legacy).length > 0) {
-            await this.commit(this.state, []);
-        }
+        return service;
     }
 
     get workspace(): Workspace {
         return this.state;
     }
 
+    async reload(): Promise<void> {
+        const { workspace, repairs, unreadable } = await this.persistence.load();
+
+        this.loadRepairs = repairs;
+        this.unreadableFiles = unreadable;
+
+        if (!this.secrets) {
+            this.state = workspace;
+            this.changeEmitter.fire({ removedIds: [] });
+
+            return;
+        }
+
+        const exposed = collectSecrets(workspace);
+        const vault = await this.secrets.readWorkspace();
+
+        this.state = restoreWorkspace(workspace, { ...vault, ...exposed });
+
+        if (Object.keys(exposed).length > 0) {
+            await this.secrets.writeWorkspace(collectSecrets(this.state));
+            await this.persistence.save(redactWorkspace(this.state));
+        }
+
+        this.changeEmitter.fire({ removedIds: [] });
+    }
+
     dispose(): void {
         this.changeEmitter.dispose();
+        this.secretFailureEmitter.dispose();
     }
 
     async createCollection(name: string): Promise<WorkspaceResult> {
@@ -116,6 +138,12 @@ export class WorkspaceService {
         return { ok: true, workspace: result.workspace, id };
     }
 
+    async clear(): Promise<void> {
+        const removedIds = Object.keys(this.state.nodes);
+
+        await this.commit(createWorkspace(), removedIds);
+    }
+
     private async apply(result: WorkspaceResult): Promise<WorkspaceResult> {
         if (result.ok) {
             await this.commit(result.workspace, []);
@@ -126,15 +154,16 @@ export class WorkspaceService {
 
     private async commit(next: Workspace, removedIds: string[]): Promise<void> {
         this.state = next;
-        const vaulted = await this.secrets?.writeWorkspace(collectSecrets(next));
 
-        await this.memento.update(STORAGE_KEY, vaulted ? redactWorkspace(next) : next);
+        if (this.secrets) {
+            const vaulted = await this.secrets.writeWorkspace(collectSecrets(next));
+
+            if (!vaulted && Object.keys(collectSecrets(next)).length > 0) {
+                this.secretFailureEmitter.fire();
+            }
+        }
+
+        await this.persistence.save(this.secrets ? redactWorkspace(next) : next);
         this.changeEmitter.fire({ removedIds });
-    }
-
-    async clear(): Promise<void> {
-        const removedIds = Object.keys(this.state.nodes);
-
-        await this.commit(createWorkspace(), removedIds);
     }
 }

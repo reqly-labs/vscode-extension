@@ -3,7 +3,7 @@ import { createSnapshot } from '../core/types';
 import { getRequest, isGroup, type Workspace } from '../core/workspace';
 import { normalizeWorkspace } from '../core/workspaceIntegrity';
 import { WorkspaceService } from '../services/WorkspaceService';
-import { FakeMemento } from './FakeMemento';
+import { FakePersistence } from './FakePersistence';
 
 function assertInvariants(workspace: Workspace, context: string): void {
     const seen = new Set<string>();
@@ -57,8 +57,8 @@ suite('workspace invariants under random operation sequences', () => {
     for (const seed of [1, 7, 42, 1337, 99999]) {
         test(`stay intact across 150 mixed operations (seed ${seed})`, async () => {
             const random = makeRandom(seed);
-            const memento = new FakeMemento();
-            const service = new WorkspaceService(memento);
+            const files = new FakePersistence();
+            const service = await WorkspaceService.open(files);
             const pick = <T>(items: T[]): T | undefined =>
                 items.length === 0 ? undefined : items[Math.floor(random() * items.length)];
 
@@ -137,7 +137,7 @@ suite('workspace invariants under random operation sequences', () => {
                 assertInvariants(service.workspace, `seed ${seed}, step ${step}`);
             }
 
-            const reloaded = new WorkspaceService(memento);
+            const reloaded = await WorkspaceService.open(files);
 
             assert.deepEqual(
                 reloaded.loadRepairs,
@@ -149,7 +149,7 @@ suite('workspace invariants under random operation sequences', () => {
     }
 
     test('normalizing an already-valid workspace changes nothing', async () => {
-        const service = new WorkspaceService(new FakeMemento());
+        const service = await WorkspaceService.open(new FakePersistence());
         const api = await service.createCollection('API');
 
         assert.ok(api.ok);
@@ -167,7 +167,7 @@ suite('workspace invariants under random operation sequences', () => {
 });
 suite('reference integrity across the panel link', () => {
     test('renaming an open request does not disturb what a later save writes', async () => {
-        const service = new WorkspaceService(new FakeMemento());
+        const service = await WorkspaceService.open(new FakePersistence());
         const collection = await service.createCollection('API');
 
         assert.ok(collection.ok);
@@ -187,7 +187,7 @@ suite('reference integrity across the panel link', () => {
         assert.equal(node?.snapshot.url, 'https://saved-after-rename.dev');
     });
     test('deleting an open request makes the save fail loudly instead of resurrecting it', async () => {
-        const service = new WorkspaceService(new FakeMemento());
+        const service = await WorkspaceService.open(new FakePersistence());
         const created = await service.createRequest(null, 'Doomed');
 
         assert.ok(created.ok);
@@ -198,7 +198,7 @@ suite('reference integrity across the panel link', () => {
         assert.equal(Object.keys(service.workspace.nodes).length, 0);
     });
     test('duplicating an open request leaves the original as the linked one', async () => {
-        const service = new WorkspaceService(new FakeMemento());
+        const service = await WorkspaceService.open(new FakePersistence());
         const created = await service.createRequest(null, 'Source');
 
         assert.ok(created.ok);
