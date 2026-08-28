@@ -216,7 +216,7 @@ suite('showing a variable in a field', () => {
     });
 });
 
-suite('the url bar carries variables', () => {
+suite('variables reach the request panel', () => {
     let harness: WebviewHarness;
 
     setup(() => {
@@ -247,7 +247,9 @@ suite('the url bar carries variables', () => {
 
         harness.window.document.getElementById('root')?.appendChild(bar);
 
-        const input = harness.window.document.querySelector<HTMLInputElement>('.variable-field');
+        const input = harness.window.document.querySelector<HTMLInputElement>(
+            '.url-input .variable-field'
+        );
 
         assert.ok(input);
         input.value = '{{baseUrl}}/apartamentos';
@@ -274,12 +276,9 @@ suite('the url bar carries variables', () => {
             variables: [],
         };
 
-        const bar = harness.createUrlBar({
-            onSend: harness.actions.send,
-            onCancel: harness.actions.cancel,
-        });
+        const header = harness.createRequestHeader({ onSave: () => {} });
 
-        harness.window.document.getElementById('root')?.appendChild(bar);
+        harness.window.document.getElementById('root')?.appendChild(header);
         harness.store.emit('environment');
 
         const label = harness.window.document.querySelector('.env-pick-label');
@@ -302,12 +301,9 @@ suite('the url bar carries variables', () => {
             variables: [],
         };
 
-        const bar = harness.createUrlBar({
-            onSend: harness.actions.send,
-            onCancel: harness.actions.cancel,
-        });
+        const header = harness.createRequestHeader({ onSave: () => {} });
 
-        harness.window.document.getElementById('root')?.appendChild(bar);
+        harness.window.document.getElementById('root')?.appendChild(header);
         harness.store.emit('environment');
 
         const items = [...harness.window.document.querySelectorAll('.env-menu .menu-item')];
@@ -319,5 +315,95 @@ suite('the url bar carries variables', () => {
         const picked = harness.posted.find((message) => message.type === 'selectEnvironment');
 
         assert.deepEqual(picked, { type: 'selectEnvironment', id: 'e2' });
+    });
+});
+
+suite('the styled box stays on the element the stylesheet targets', () => {
+    let harness: WebviewHarness;
+
+    setup(() => {
+        harness = mountWebview();
+        harness.store.state.environment = {
+            id: null,
+            name: '',
+            names: [],
+            variables: VARIABLES,
+        };
+    });
+
+    teardown(() => {
+        harness.dispose();
+    });
+
+    test('puts the caller class on the wrapper and keeps the field bare', () => {
+        const handle = harness.createVariableInput({
+            value: '',
+            className: 'field kv-key',
+            ariaLabel: 'Parameter',
+            onInput: () => {},
+        });
+
+        assert.deepEqual([...handle.root.classList].sort(), ['field', 'kv-key', 'variable-input']);
+        assert.deepEqual([...handle.input.classList], ['variable-field']);
+        assert.equal(handle.input.parentElement, handle.root);
+    });
+
+    test('keeps the url bar box on the wrapper so the row stays aligned', () => {
+        harness.store.hydrate(webviewState({ url: '' }, null), {
+            id: null,
+            name: '',
+            location: '',
+        });
+
+        const bar = harness.createUrlBar({
+            onSend: harness.actions.send,
+            onCancel: harness.actions.cancel,
+        });
+
+        harness.window.document.getElementById('root')?.appendChild(bar);
+
+        const wrapper = harness.window.document.querySelector('.url-input');
+
+        assert.ok(wrapper);
+        assert.equal(wrapper.classList.contains('variable-input'), true);
+        assert.equal(wrapper.parentElement?.classList.contains('url-shell'), true);
+        assert.ok(wrapper.querySelector('.variable-field'));
+        assert.ok(wrapper.querySelector('.variable-backdrop'));
+    });
+
+    test('gives every key and value row the same box the plain fields had', () => {
+        harness.store.hydrate(
+            webviewState({
+                params: [{ id: 'p', key: 'page', value: '2', enabled: true }],
+            }),
+            { id: null, name: '', location: '' }
+        );
+
+        const editor = harness.createRequestEditor();
+
+        harness.window.document.getElementById('root')?.appendChild(editor);
+
+        for (const selector of ['.kv-key', '.kv-value']) {
+            const node = harness.window.document.querySelector(selector);
+
+            assert.ok(node, `expected ${selector}`);
+            assert.equal(node.classList.contains('field'), true, `${selector} lost its box`);
+            assert.equal(node.classList.contains('variable-input'), true);
+        }
+    });
+
+    test('leaves the environment picker out of the url bar', () => {
+        harness.store.hydrate(webviewState({}), { id: null, name: '', location: '' });
+
+        const bar = harness.createUrlBar({
+            onSend: harness.actions.send,
+            onCancel: harness.actions.cancel,
+        });
+
+        assert.equal(bar.querySelector('.env-menu'), null);
+
+        const header = harness.createRequestHeader({ onSave: () => {} });
+
+        assert.ok(header.querySelector('.request-tools .env-menu'));
     });
 });

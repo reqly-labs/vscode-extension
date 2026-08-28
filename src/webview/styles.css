@@ -433,7 +433,8 @@ body {
         box-shadow var(--transition-fast);
 }
 
-.field:focus {
+.field:focus,
+.field:focus-within {
     outline: none;
     border-color: color-mix(in oklch, var(--color-primary) 60%, transparent);
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-primary) 20%, transparent);
@@ -1349,38 +1350,50 @@ code {
 
 .variable-input {
     display: block;
-    flex: 1;
-    min-width: 0;
     position: relative;
 }
 
-.variable-backdrop,
-.variable-field {
+.variable-input > .variable-backdrop {
+    align-items: center;
+    border-color: transparent;
+    color: var(--color-text);
+    display: flex;
     font: inherit;
+    inset: 0;
     letter-spacing: inherit;
+    overflow: hidden;
+    padding: inherit;
+    pointer-events: none;
+    position: absolute;
     white-space: pre;
+}
+
+.variable-input > .variable-field {
+    background: transparent;
+    border: 0;
+    border-radius: inherit;
+    caret-color: var(--color-text);
+    color: transparent;
+    display: block;
+    font: inherit;
+    height: 100%;
+    letter-spacing: inherit;
+    margin: 0;
+    padding: 0;
+    position: relative;
     width: 100%;
 }
 
-.variable-backdrop {
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    position: absolute;
-    background: transparent;
-    border-color: transparent;
-    color: var(--color-text);
+.variable-input > .variable-field:focus {
+    outline: none;
 }
 
-.variable-field {
-    background: transparent;
-    caret-color: var(--color-text);
-    color: transparent;
-    position: relative;
+.variable-input > .variable-field::placeholder {
+    color: var(--color-text-subtle);
 }
 
-.variable-field::selection {
-    background: color-mix(in srgb, var(--color-primary) 35%, transparent);
+.variable-input > .variable-field::selection {
+    background: color-mix(in oklch, var(--color-primary) 35%, transparent);
     color: transparent;
 }
 
@@ -1390,10 +1403,10 @@ code {
 }
 
 .variable-popup {
-    background: var(--color-popover, var(--color-surface));
+    background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md, 6px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 28%);
     display: none;
     left: 0;
     max-height: 220px;
@@ -1405,7 +1418,7 @@ code {
     z-index: 60;
 }
 
-.variable-input.is-open .variable-popup {
+.variable-popup.is-open {
     display: block;
 }
 
@@ -1413,11 +1426,11 @@ code {
     align-items: center;
     background: transparent;
     border: none;
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     color: var(--color-text);
     cursor: pointer;
     display: flex;
-    font-family: inherit;
+    font-family: var(--font-sans);
     font-size: 11px;
     gap: 12px;
     justify-content: space-between;
@@ -1432,7 +1445,7 @@ code {
 
 .variable-option-key {
     color: var(--color-success);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-weight: 600;
 }
 
@@ -1443,20 +1456,45 @@ code {
     white-space: nowrap;
 }
 
+.request-tools {
+    align-items: center;
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+}
+
+.env-menu {
+    position: relative;
+}
+
 .env-menu .env-pick {
     align-items: center;
-    background: var(--color-surface);
+    background: transparent;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md, 6px);
+    border-radius: var(--radius-md);
     color: var(--color-text-subtle);
     cursor: pointer;
-    display: flex;
-    gap: 6px;
-    font-family: inherit;
+    display: inline-flex;
+    font-family: var(--font-sans);
     font-size: 11px;
-    max-width: 170px;
-    padding: 0 10px;
-    height: 34px;
+    gap: 6px;
+    height: 24px;
+    max-width: 190px;
+    padding: 0 9px;
+    transition:
+        border-color var(--transition-fast),
+        color var(--transition-fast);
+}
+
+.env-menu .env-pick:hover {
+    border-color: color-mix(in oklch, var(--color-primary) 45%, transparent);
+    color: var(--color-text);
+}
+
+.env-menu .env-pick svg {
+    flex-shrink: 0;
+    height: 13px;
+    width: 13px;
 }
 
 .env-menu .env-pick.is-set {
@@ -1465,6 +1503,11 @@ code {
 
 .env-menu .env-pick.is-set svg {
     color: var(--color-success);
+}
+
+.env-menu .menu-popup {
+    left: auto;
+    right: 0;
 }
 
 .env-pick-label {

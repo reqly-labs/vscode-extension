@@ -8,7 +8,9 @@ import {
 } from './webviewHarness';
 
 function urlInputOf(harness: WebviewHarness): HTMLInputElement {
-    const input = harness.window.document.querySelector<HTMLInputElement>('.url-input');
+    const input = harness.window.document.querySelector<HTMLInputElement>(
+        '.url-input .variable-field'
+    );
 
     assert.ok(input, 'expected the url bar to render an input');
 
@@ -111,11 +113,14 @@ suite('webview request flow', () => {
             )
         );
         harness.store.emit('params');
-        const keys = harness.window.document.querySelectorAll<HTMLInputElement>('.kv-key');
+        const keys =
+            harness.window.document.querySelectorAll<HTMLInputElement>('.kv-key .variable-field');
 
         assert.equal(keys.length, 1);
         assert.equal(keys[0].value, 'page');
-        const values = harness.window.document.querySelectorAll<HTMLInputElement>('.kv-value');
+        const values = harness.window.document.querySelectorAll<HTMLInputElement>(
+            '.kv-value .variable-field'
+        );
 
         typeInto(values[0], '2');
         assert.equal(harness.store.state.snapshot.params[0].value, '2');
@@ -207,19 +212,19 @@ suite('webview hydration', () => {
         );
 
         assert.equal(
-            query<HTMLInputElement>('.url-input').value,
+            query<HTMLInputElement>('.url-input .variable-field').value,
             'https://api.example.com/apartamentos'
         );
         assert.equal(query('.select-method .select-label').textContent, 'POST');
 
         assert.deepEqual(
-            queryAll<HTMLInputElement>('.kv-key').map((node) => node.value),
+            queryAll<HTMLInputElement>('.kv-key .variable-field').map((node) => node.value),
             ['page']
         );
 
         clickTab('Headers');
         assert.deepEqual(
-            queryAll<HTMLInputElement>('.kv-key').map((node) => node.value),
+            queryAll<HTMLInputElement>('.kv-key .variable-field').map((node) => node.value),
             ['X-New']
         );
 
@@ -266,7 +271,7 @@ suite('webview hydration', () => {
             location: '',
         });
 
-        const keys = queryAll<HTMLInputElement>('.kv-key');
+        const keys = queryAll<HTMLInputElement>('.kv-key .variable-field');
 
         assert.equal(keys.length, 1);
         assert.equal(keys[0].value, '');

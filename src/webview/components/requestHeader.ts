@@ -2,6 +2,7 @@ import { post } from '../bridge';
 import { el, replace } from '../dom';
 import { icon } from '../icons';
 import { isDirty, on, state } from '../store';
+import { createEnvironmentPicker } from './environmentPicker';
 
 export function createRequestHeader(options: { onSave: () => void }): HTMLElement {
     const mark = el('span', { class: 'request-dot', title: 'Unsaved changes' });
@@ -18,11 +19,12 @@ export function createRequestHeader(options: { onSave: () => void }): HTMLElemen
         icon('save'),
         saveLabel
     );
+    const environment = createEnvironmentPicker();
     const root = el(
         'div',
         { class: 'request-header' },
         el('div', { class: 'request-identity' }, mark, title, trail),
-        saveButton
+        el('div', { class: 'request-tools' }, environment.root, saveButton)
     );
     const paint = () => {
         const { active } = state;

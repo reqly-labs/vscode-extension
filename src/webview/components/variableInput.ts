@@ -53,7 +53,7 @@ export function highlightTokens(value: string): Node[] {
 export function createVariableInput(options: VariableInputOptions): VariableInputHandle {
     const backdrop = el('div', { class: 'variable-backdrop', attrs: { 'aria-hidden': 'true' } });
     const input = el('input', {
-        class: `variable-field ${options.className ?? ''}`.trim(),
+        class: 'variable-field',
         value: options.value,
         spellcheck: false,
         placeholder: options.placeholder ?? '',
@@ -84,7 +84,13 @@ export function createVariableInput(options: VariableInputOptions): VariableInpu
             input.setSelectionRange(caret, caret);
         },
     });
-    const root = el('div', { class: 'variable-input' }, backdrop, input, suggestions.root);
+    const root = el(
+        'div',
+        { class: `variable-input ${options.className ?? ''}`.trim() },
+        backdrop,
+        input,
+        suggestions.root
+    );
 
     const sync = () => {
         const caret = input.selectionStart ?? input.value.length;
