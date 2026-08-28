@@ -9,7 +9,7 @@ import {
 } from '../core/constants';
 import type { HttpMethod, RequestSettings, ResponseTimings } from '../core/types';
 import type { WireRequest } from './buildRequest';
-import { trustedContext } from './certificates';
+import { trustedCertificates } from './certificates';
 
 export class TransportError extends Error {
     constructor(
@@ -33,13 +33,6 @@ export interface RawResponse {
 }
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
-let agent: https.Agent | undefined;
-
-function secureAgent(): https.Agent {
-    agent ??= new https.Agent({ keepAlive: true, secureContext: trustedContext() });
-
-    return agent;
-}
 
 function decompressor(encoding: string | undefined): Duplex | null {
     switch (encoding?.trim().toLowerCase()) {
@@ -113,7 +106,8 @@ function performExchange(
     headers: Record<string, string>,
     body: Buffer | undefined,
     settings: RequestSettings,
-    signal: AbortSignal
+    signal: AbortSignal,
+    deadline: number
 ): Promise<Exchange> {
     return new Promise<Exchange>((resolve, reject) => {
         const secure = url.protocol === 'https:';
@@ -126,7 +120,7 @@ function performExchange(
                 method,
                 headers,
                 rejectUnauthorized: settings.rejectUnauthorized,
-                agent: secure ? secureAgent() : undefined,
+                ca: secure ? trustedCertificates() : undefined,
                 signal,
             },
             (response) => {
@@ -185,9 +179,13 @@ function performExchange(
             }
         );
 
-        request.setTimeout(settings.timeout, () => {
+        const expire = () => {
             request.destroy(new TransportError(`Request timed out after ${settings.timeout} ms.`));
-        });
+        };
+        const budget = setTimeout(expire, Math.max(0, deadline - Date.now()));
+
+        request.setTimeout(settings.timeout, expire);
+        request.on('close', () => clearTimeout(budget));
         request.on('socket', (socket) => {
             if (!socket.connecting) {
                 return;
@@ -313,8 +311,18 @@ export async function executeRequest(
         total: 0,
     };
 
+    const deadline = Date.now() + settings.timeout;
+
     for (let hop = 0; ; hop++) {
-        const exchange = await performExchange(url, method, headers, body, settings, signal);
+        const exchange = await performExchange(
+            url,
+            method,
+            headers,
+            body,
+            settings,
+            signal,
+            deadline
+        );
 
         totals.dns += exchange.timings.dns;
         totals.connect += exchange.timings.connect;

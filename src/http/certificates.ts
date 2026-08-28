@@ -1,9 +1,10 @@
+import { readFile } from 'node:fs/promises';
 import * as tls from 'node:tls';
 
 type CertificateSource = 'default' | 'system' | 'bundled' | 'extra';
 
 let trusted: string[] | undefined;
-let context: tls.SecureContext | undefined;
+let additional: string[] = [];
 
 export function mergeCertificates(...sources: readonly (readonly string[])[]): string[] {
     const merged = new Set<string>();
@@ -37,14 +38,31 @@ export function trustedCertificates(): string[] {
     trusted ??= mergeCertificates(
         readCertificates('default'),
         readCertificates('system'),
-        readCertificates('extra')
+        readCertificates('extra'),
+        additional
     );
 
     return trusted;
 }
 
-export function trustedContext(): tls.SecureContext {
-    context ??= tls.createSecureContext({ ca: trustedCertificates() });
+export function useAdditionalCertificates(certificates: readonly string[]): void {
+    additional = mergeCertificates(certificates);
+    trusted = undefined;
+}
 
-    return context;
+export async function readCertificateFiles(
+    paths: readonly string[]
+): Promise<{ certificates: string[]; failures: string[] }> {
+    const certificates: string[] = [];
+    const failures: string[] = [];
+
+    for (const path of paths) {
+        try {
+            certificates.push(await readFile(path, 'utf8'));
+        } catch {
+            failures.push(path);
+        }
+    }
+
+    return { certificates: mergeCertificates(certificates), failures };
 }

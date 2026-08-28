@@ -4,12 +4,7 @@ import * as https from 'node:https';
 import { AddressInfo } from 'node:net';
 import { createSettings, createSnapshot } from '../core/types';
 import { buildRequest } from '../http/buildRequest';
-import {
-    mergeCertificates,
-    readCertificates,
-    trustedCertificates,
-    trustedContext,
-} from '../http/certificates';
+import { mergeCertificates, readCertificates, trustedCertificates } from '../http/certificates';
 import { executeRequest, TransportError } from '../http/executeRequest';
 
 const CERT = `-----BEGIN CERTIFICATE-----
@@ -104,9 +99,6 @@ suite('certificates', () => {
     });
     test('builds the list once and reuses it', () => {
         assert.equal(trustedCertificates(), trustedCertificates());
-    });
-    test('compiles the trust store once instead of per request', () => {
-        assert.equal(trustedContext(), trustedContext());
     });
 });
 suite('tls failures', () => {

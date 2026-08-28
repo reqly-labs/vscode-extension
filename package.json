@@ -114,6 +114,19 @@
                     "group": "navigation@2"
                 }
             ]
+        },
+        "configuration": {
+            "title": "Reqly",
+            "properties": {
+                "reqly.certificateAuthority": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "markdownDescription": "Paths to additional CA certificate files (PEM) to trust when verifying TLS. Use this when the issuing authority is not installed in the operating system certificate store."
+                }
+            }
         }
     },
     "scripts": {

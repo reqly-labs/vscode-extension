@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
+import { readCertificateFiles, useAdditionalCertificates } from './http/certificates';
 import { RequestPanel, type PanelDependencies } from './panel/RequestPanel';
 import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
-import { RequestStateService } from './services/RequestStateService';
+import { Reques,
+    tStateService } from './services/RequestStateService';
 import { SecretStore } from './services/SecretStore';
 import { WorkspaceService } from './services/WorkspaceService';
 
@@ -52,6 +54,14 @@ export function activate(context: vscode.ExtensionContext): void {
     );
     void workspaceService.restoreSecrets();
     void store.migrate();
+    void loadCertificateAuthorities();
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration('reqly.certificateAuthority')) {
+                void loadCertificateAuthorities();
+            }
+        })
+    );
     if (workspaceService.loadRepairs.length > 0) {
         void reportRepairs(workspaceService.loadRepairs);
     }
@@ -75,3 +85,18 @@ async function reportRepairs(repairs: string[]): Promise<void> {
 }
 
 export function deactivate(): void {}
+
+async function loadCertificateAuthorities(): Promise<void> {
+    const paths = vscode.workspace
+        .getConfiguration('reqly')
+        .get<string[]>('certificateAuthority', []);
+    const { certificates, failures } = await readCertificateFiles(paths);
+
+    useAdditionalCertificates(certificates);
+
+    if (failures.length > 0) {
+        void vscode.window.showWarningMessage(
+            `Reqly could not read ${failures.length} CA certificate file${failures.length === 1 ? '' : 's'}: ${failures.join(', ')}`
+        );
+    }
+}
