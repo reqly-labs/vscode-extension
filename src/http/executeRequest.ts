@@ -151,7 +151,7 @@ function performExchange(
 
                     const room = limit - received;
 
-                    if (chunk.byteLength < room) {
+                    if (chunk.byteLength <= room) {
                         chunks.push(chunk);
                         received += chunk.byteLength;
 

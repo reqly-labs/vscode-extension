@@ -111,6 +111,14 @@ suite('response size limit', () => {
         assert.equal(response.body.byteLength, CHUNK * TOTAL_CHUNKS);
     });
 
+    test('does not call a response that lands exactly on the limit truncated', async () => {
+        const exact = CHUNK * TOTAL_CHUNKS;
+        const response = await fetch('/stream', { maxResponseSize: exact });
+
+        assert.equal(response.capped, false, 'a complete body was reported as cut short');
+        assert.equal(response.body.byteLength, exact);
+    });
+
     test('does not flag a small response', async () => {
         const response = await fetch('/small', { maxResponseSize: DEFAULT_MAX_RESPONSE_BYTES });
 

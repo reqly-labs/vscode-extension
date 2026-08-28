@@ -4,7 +4,7 @@
         "moduleResolution": "bundler",
         "target": "ES2022",
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
-        "types": ["node"],
+        "types": ["node", "mocha"],
         "rootDir": "src",
         "sourceMap": true,
         "strict": true,
@@ -14,6 +14,5 @@
         "noEmit": true,
         "skipLibCheck": true
     },
-    "include": ["src"],
-    "exclude": ["src/test"]
+    "include": ["src"]
 }

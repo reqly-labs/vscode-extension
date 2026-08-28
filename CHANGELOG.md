@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-28
+
+A bug fix release. Requests that looked ready refused to send, TLS verification ignored the machine's
+own certificate authorities, saved credentials sat in plain text, and a large response could take the
+extension host down with it.
+
+### Fixed
+
+- Sending a request typed right after another one was opened no longer reports "Enter a URL before
+  sending the request." with the URL plainly filled in. The panel's editors held on to the request
+  they were mounted with, so edits after loading a second request were written to the previous one
+  and silently lost. Params, headers, body, auth and the method were affected the same way.
+- Loading a request now repaints the whole panel. The per-request settings kept the previous
+  request's timeout, redirect and TLS values, and the response tab selection was never applied.
+- TLS verification now trusts the certificate authorities installed on the machine, not only the list
+  compiled into Node. Corporate roots, inspection proxies and locally installed development
+  authorities are honoured, instead of failing with "unable to verify the first certificate" and
+  offering to turn certificate validation off as the only way forward.
+- TLS failures say what actually went wrong — expired, issued for another host, self-signed, or a
+  chain that could not be verified — and point at the certificate store before the escape hatch.
+- The request timeout is now a deadline for the whole request, shared across the redirect chain.
+  It only bounded socket inactivity before, so a server trickling a byte at a time was never cut off.
+- A response is no longer read into memory without limit. Oversized bodies stop at the configured
+  size and are reported as cut short, rather than growing until the extension host runs out of
+  memory. The size is measured after decompression, so a small compressed payload cannot expand past
+  the limit.
+- Editor state left in flight when another request is opened is no longer written over the newly
+  opened request.
+
+### Security
+
+- Bearer tokens, Basic auth passwords and API key values are stored in VS Code's `SecretStorage`,
+  backed by the operating system keychain, instead of plain text in extension state. Credentials
+  already saved are moved on first start; nothing to do by hand. The rest of the request stays
+  readable where it was. If the keychain is unavailable the credential is kept where it is rather
+  than being dropped.
+
+### Added
+
+- `reqly.certificateAuthority`: paths to extra PEM certificate authorities to trust, for a root that
+  is not installed in the operating system store. Reloaded when the setting changes.
+- A **Max response size** control next to the timeout in the per-request settings, in megabytes,
+  defaulting to 50 MB.
+
 ## [1.1.0] - 2026-08-23
 
 Collections. Requests can now be grouped, named and kept, instead of the panel holding one throwaway
@@ -85,6 +129,7 @@ that `localhost` services, self-signed certificates and arbitrary headers all wo
   editor themes.
 - `Ctrl+Alt+Enter` / `Cmd+Alt+Enter` keybinding to send the current request from anywhere in VS Code.
 
-[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.1.0...HEAD
+[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.2.0
 [1.1.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.1.0
 [1.0.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.0.0

@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import * as https from 'node:https';
 import { AddressInfo } from 'node:net';
+import * as net from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSettings, createSnapshot } from '../core/types';
@@ -61,9 +62,25 @@ okHoL8P3Vq+4sJ8DgfrTbsvL2tugM4DTOYUPWEIf5oSqm1JoLMnDRfROKqAx+GYF
 ZxUM3Frr7+Zjwhl0YUYicfU=
 -----END PRIVATE KEY-----`;
 
+const REMOTE_HOST = '127.0.0.2';
+
+function reachable(host: string, port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+        const socket = net.connect({ host, port });
+        const settle = (value: boolean) => {
+            socket.destroy();
+            resolve(value);
+        };
+
+        socket.once('connect', () => settle(true));
+        socket.once('error', () => settle(false));
+    });
+}
+
 suite('trust reaches the connection', () => {
     let server: https.Server;
     let port = 0;
+    let remoteUsable = false;
 
     suiteSetup(async () => {
         server = https.createServer({ cert: CERT, key: KEY }, (_request, response) => {
@@ -73,6 +90,7 @@ suite('trust reaches the connection', () => {
 
         await new Promise<void>((resolve) => server.listen(0, '0.0.0.0', resolve));
         port = (server.address() as AddressInfo).port;
+        remoteUsable = await reachable(REMOTE_HOST, port);
     });
 
     suiteTeardown(async () => {
@@ -99,17 +117,29 @@ suite('trust reaches the connection', () => {
         return { status: response.status, body: response.body.toString() };
     }
 
-    test('rejects an unknown authority before it is trusted', async () => {
-        await assert.rejects(get('127.0.0.2'), (error) => error instanceof TransportError);
+    test('rejects an unknown authority before it is trusted', async function () {
+        if (!remoteUsable) {
+            this.skip();
+        }
+
+        await assert.rejects(get(REMOTE_HOST), (error) => error instanceof TransportError);
     });
 
-    test('honours an added authority for a host the runtime does not call local', async () => {
+    test('honours an added authority for a host the runtime does not call local', async function () {
+        if (!remoteUsable) {
+            this.skip();
+        }
+
         useAdditionalCertificates([CERT]);
 
-        const response = await get('127.0.0.2');
+        const response = await get(REMOTE_HOST);
 
         assert.equal(response.status, 200);
         assert.equal(response.body, 'trusted');
+    });
+
+    test('rejects an unknown authority on loopback too', async () => {
+        await assert.rejects(get('127.0.0.1'), (error) => error instanceof TransportError);
     });
 
     test('honours an added authority on loopback as well', async () => {

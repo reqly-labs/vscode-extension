@@ -2,8 +2,7 @@ import * as vscode from 'vscode';
 import { readCertificateFiles, useAdditionalCertificates } from './http/certificates';
 import { RequestPanel, type PanelDependencies } from './panel/RequestPanel';
 import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
-import { Reques,
-    tStateService } from './services/RequestStateService';
+import { RequestStateService } from './services/RequestStateService';
 import { SecretStore } from './services/SecretStore';
 import { WorkspaceService } from './services/WorkspaceService';
 

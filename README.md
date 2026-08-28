@@ -109,8 +109,14 @@ command, ready to paste into a terminal, a ticket, or a teammate's chat.
 ### Per-request settings
 
 A gear next to the send button controls the request timeout, whether 3xx responses are followed
-automatically, and whether TLS certificates are verified. Turn verification off and a self-signed
-development certificate stops being a wall.
+automatically, whether TLS certificates are verified, and how much of a response is read into memory.
+The timeout is a deadline for the whole request, shared across the redirect chain, not just a guard
+against an idle socket.
+
+TLS verification trusts the certificate authorities installed on your machine, not only the ones
+compiled into Node, so a corporate root or an inspection proxy works without turning verification
+off. For an authority that is not in the system store, point `reqly.certificateAuthority` at its PEM
+file. Turning verification off is still there for a throwaway self-signed certificate.
 
 Redirects are handled carefully: `Authorization` and `Cookie` headers are dropped when a hop crosses
 origins, and the request body and its `Content-Type` are dropped when the status code says they
@@ -119,7 +125,9 @@ should be.
 ### Built for real payloads
 
 Responses are decompressed automatically for `gzip`, `deflate` and `brotli`, and text is decoded
-using the charset the server declared rather than a guess. Long-running requests can be cancelled
+using the charset the server declared rather than a guess. A response is read up to the configured
+size limit and reported as cut short past it, measured after decompression, so an endpoint returning
+far more than you expected cannot exhaust the editor's memory. Long-running requests can be cancelled
 mid-flight with the same button that sent them.
 
 ### At home in your editor
@@ -224,20 +232,34 @@ decisions at all.
 
 ## Extension Settings
 
-Reqly does not add anything to `settings.json`. Request options (timeout, redirect following, TLS
-verification) live with the request itself, behind the gear icon next to the send button, so two
-workspaces can disagree without fighting over a global setting.
+Request options — timeout, redirect following, TLS verification, maximum response size — live with
+the request itself, behind the gear icon next to the send button, so two workspaces can disagree
+without fighting over a global setting.
+
+One setting lives in `settings.json`, because it describes the machine rather than the request:
+
+| Setting                      | Type       | Default | Description                                                                                                |
+| ---------------------------- | ---------- | ------- | ---------------------------------------------------------------------------------------------------------- |
+| `reqly.certificateAuthority` | `string[]` | `[]`    | Paths to extra PEM certificate authorities to trust, for a root that is not installed in the system store. |
+
+Requests go out through the editor's own HTTP stack, so VS Code's `http.proxy` setting and the
+standard proxy environment variables apply, following whatever `http.proxySupport` is set to.
+
+Credentials are not kept in `settings.json` or in extension state. Bearer tokens, Basic auth
+passwords and API key values go to VS Code's `SecretStorage`, backed by the operating system
+keychain.
 
 ## Known Issues
 
 - One request open at a time: opening another replaces what the panel is showing, and sending again
   replaces the request in flight.
 - Deleting is permanent. There is a confirmation prompt, but no undo afterwards.
-- Credentials saved inside a request are stored in plain text in VS Code's global state, the same as
-  in other local API clients. Treat a saved token the way you would treat one in a scratch file.
 - Responses over 5 MB are not previewed in the panel. Use **Save** to write them to disk.
+- Responses are held in memory while they are read, so the size limit is a real ceiling rather than a
+  display threshold. There is no streaming to disk yet.
+- No cookie jar: a `Set-Cookie` on one response is not sent back on the next request.
+- No client certificate (mTLS) authentication.
 - No request history yet.
-- Proxy configuration is not read from VS Code settings yet.
 
 ## Roadmap
 
@@ -246,7 +268,8 @@ workspaces can disagree without fighting over a global setting.
 - Multiple request tabs.
 - Request history.
 - `.http` and OpenAPI file import.
-- Proxy support driven by the editor's own settings.
+- A cookie jar for session based APIs.
+- Client certificates for mTLS.
 
 ## Contributing
 
