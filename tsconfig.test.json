@@ -10,7 +10,10 @@
         "sourceMap": true,
         "strict": true,
         "esModuleInterop": true,
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "paths": {
+            "@reqly/design-system": ["./node_modules/@reqly/design-system/dist/index.d.cts"]
+        }
     },
     "include": ["src/test", "src/core", "src/http", "src/services", "src/utils", "src/webview"],
     "exclude": ["src/webview/main.ts"]

@@ -51,19 +51,27 @@ export function activate(context: vscode.ExtensionContext): void {
             RequestPanel.show(context, deps).triggerSave();
         })
     );
-    void workspaceService.restoreSecrets();
-    void store.migrate();
-    void loadCertificateAuthorities();
+    background('restore saved credentials', workspaceService.restoreSecrets());
+    background('move credentials into the keychain', store.migrate());
+    background('load certificate authorities', loadCertificateAuthorities());
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('reqly.certificateAuthority')) {
-                void loadCertificateAuthorities();
+                background('load certificate authorities', loadCertificateAuthorities());
             }
         })
     );
     if (workspaceService.loadRepairs.length > 0) {
-        void reportRepairs(workspaceService.loadRepairs);
+        background('report workspace repairs', reportRepairs(workspaceService.loadRepairs));
     }
+}
+
+function background(what: string, work: Promise<void>): void {
+    work.catch((error: unknown) => {
+        const detail = error instanceof Error ? error.message : String(error);
+
+        void vscode.window.showWarningMessage(`Reqly could not ${what}: ${detail}`);
+    });
 }
 
 async function reportRepairs(repairs: string[]): Promise<void> {
