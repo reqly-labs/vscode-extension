@@ -2,12 +2,10 @@ import {
     completeVariableToken,
     findActiveVariableToken,
     findVariableTokens,
-    matchVariables,
     type ActiveVariableToken,
-    type Variable,
 } from '../../core/variables';
 import { el, replace } from '../dom';
-import { state } from '../store';
+import { createSuggestionList } from './variableSuggestions';
 
 export interface VariableInputHandle {
     root: HTMLElement;
@@ -26,9 +24,7 @@ export interface VariableInputOptions {
     onPaste?: (event: ClipboardEvent) => boolean;
 }
 
-let openDropdown: (() => void) | null = null;
-
-function highlight(value: string): Node[] {
+export function highlightTokens(value: string): Node[] {
     const tokens = findVariableTokens(value);
 
     if (tokens.length === 0) {
@@ -56,8 +52,6 @@ function highlight(value: string): Node[] {
 
 export function createVariableInput(options: VariableInputOptions): VariableInputHandle {
     const backdrop = el('div', { class: 'variable-backdrop', attrs: { 'aria-hidden': 'true' } });
-    const list = el('div', { class: 'variable-list', role: 'listbox' });
-    const popup = el('div', { class: 'variable-popup' }, list);
     const input = el('input', {
         class: `variable-field ${options.className ?? ''}`.trim(),
         value: options.value,
@@ -65,94 +59,44 @@ export function createVariableInput(options: VariableInputOptions): VariableInpu
         placeholder: options.placeholder ?? '',
         attrs: { 'aria-label': options.ariaLabel, autocomplete: 'off', role: 'combobox' },
     });
-    const root = el('div', { class: 'variable-input' }, backdrop, input, popup);
 
     let token: ActiveVariableToken | null = null;
-    let matches: Variable[] = [];
-    let activeIndex = 0;
 
     const paint = () => {
-        replace(backdrop, ...highlight(input.value));
+        replace(backdrop, ...highlightTokens(input.value));
         backdrop.scrollLeft = input.scrollLeft;
     };
 
-    const close = () => {
-        token = null;
-        matches = [];
-        root.classList.remove('is-open');
+    const suggestions = createSuggestionList({
+        onAccept: (key) => {
+            if (!token) {
+                return;
+            }
 
-        if (openDropdown === close) {
-            openDropdown = null;
-        }
-    };
+            const { text, caret } = completeVariableToken(input.value, token, key);
 
-    const renderMatches = () => {
-        replace(
-            list,
-            ...matches.map((variable, index) =>
-                el(
-                    'button',
-                    {
-                        class: `variable-option${index === activeIndex ? ' is-active' : ''}`,
-                        type: 'button',
-                        role: 'option',
-                        attrs: { 'aria-selected': index === activeIndex ? 'true' : 'false' },
-                        on: {
-                            mousedown: (event) => event.preventDefault(),
-                            mouseenter: () => {
-                                activeIndex = index;
-                                renderMatches();
-                            },
-                            click: () => accept(variable.key),
-                        },
-                    },
-                    el('span', { class: 'variable-option-key', text: variable.key }),
-                    el('span', {
-                        class: 'variable-option-value',
-                        text: variable.secret ? '••••••' : variable.value || '(empty)',
-                    })
-                )
-            )
-        );
-        const active = list.querySelector('.variable-option.is-active');
-
-        if (active && typeof active.scrollIntoView === 'function') {
-            active.scrollIntoView({ block: 'nearest' });
-        }
-    };
+            input.value = text;
+            options.onInput(text);
+            paint();
+            token = null;
+            root.classList.remove('is-open');
+            input.focus();
+            input.setSelectionRange(caret, caret);
+        },
+    });
+    const root = el('div', { class: 'variable-input' }, backdrop, input, suggestions.root);
 
     const sync = () => {
         const caret = input.selectionStart ?? input.value.length;
 
         token = findActiveVariableToken(input.value, caret);
-        matches = token ? matchVariables(state.environment.variables, token.query) : [];
-
-        if (!token || matches.length === 0) {
-            close();
-
-            return;
-        }
-
-        activeIndex = 0;
-        openDropdown?.();
-        openDropdown = close;
-        root.classList.add('is-open');
-        renderMatches();
+        root.classList.toggle('is-open', token !== null && suggestions.open(token.query));
     };
 
-    const accept = (key: string) => {
-        if (!token) {
-            return;
-        }
-
-        const { text, caret } = completeVariableToken(input.value, token, key);
-
-        input.value = text;
-        options.onInput(text);
-        paint();
-        close();
-        input.focus();
-        input.setSelectionRange(caret, caret);
+    const close = () => {
+        token = null;
+        suggestions.close();
+        root.classList.remove('is-open');
     };
 
     input.addEventListener('input', () => {
@@ -165,36 +109,10 @@ export function createVariableInput(options: VariableInputOptions): VariableInpu
     input.addEventListener('focus', sync);
     input.addEventListener('blur', close);
     input.addEventListener('keydown', (event) => {
-        if (root.classList.contains('is-open') && matches.length > 0) {
-            if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                activeIndex = (activeIndex + 1) % matches.length;
-                renderMatches();
+        if (suggestions.handleKey(event)) {
+            root.classList.toggle('is-open', suggestions.isOpen());
 
-                return;
-            }
-
-            if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                activeIndex = (activeIndex - 1 + matches.length) % matches.length;
-                renderMatches();
-
-                return;
-            }
-
-            if (event.key === 'Enter' || event.key === 'Tab') {
-                event.preventDefault();
-                accept(matches[activeIndex].key);
-
-                return;
-            }
-
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                close();
-
-                return;
-            }
+            return;
         }
 
         if (event.key === 'Enter') {

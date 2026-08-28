@@ -1482,3 +1482,20 @@ code {
 .menu-item.is-selected {
     color: var(--color-success);
 }
+
+.code-editor {
+    position: relative;
+}
+
+.code-caret-probe {
+    font: inherit;
+    left: -9999px;
+    position: absolute;
+    top: -9999px;
+    visibility: hidden;
+    white-space: pre;
+}
+
+.code-editor .variable-popup {
+    position: absolute;
+}

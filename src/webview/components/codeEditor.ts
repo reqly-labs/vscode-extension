@@ -1,5 +1,7 @@
+import { completeVariableToken, findActiveVariableToken } from '../../core/variables';
 import { el } from '../dom';
 import { highlight, type Language } from '../highlight';
+import { createSuggestionList } from './variableSuggestions';
 
 const OPEN_TO_CLOSE: Record<string, string> = { '{': '}', '[': ']', '(': ')', '"': '"', "'": "'" };
 const OPENERS = new Set(Object.keys(OPEN_TO_CLOSE));
@@ -138,24 +140,81 @@ export function createEditor(options: {
         placeholder: options.placeholder ?? '',
         attrs: { autocapitalize: 'off', autocorrect: 'off', wrap: 'off' },
     });
-    const scroller = el('div', { class: 'code-scroll' }, layer, input);
-    const root = el('div', { class: 'code-editor' }, gutter, scroller);
+    const caretProbe = el('span', { class: 'code-caret-probe' });
+
+    let token: ReturnType<typeof findActiveVariableToken> = null;
+
+    const suggestions = createSuggestionList({
+        onAccept: (key) => {
+            if (!token) {
+                return;
+            }
+
+            const { text, caret } = completeVariableToken(input.value, token, key);
+
+            input.value = text;
+            token = null;
+            paint();
+            options.onChange(text);
+            input.focus();
+            input.setSelectionRange(caret, caret);
+        },
+    });
+    const scroller = el('div', { class: 'code-scroll' }, layer, input, caretProbe);
+    const root = el('div', { class: 'code-editor' }, gutter, scroller, suggestions.root);
     const paint = () => {
         const value = input.value;
 
         gutter.textContent = gutterFor(countLines(value));
-        layer.innerHTML = `${highlight(value, language)}\n`;
+        layer.innerHTML = `${highlight(value, language, { variables: true })}\n`;
+    };
+
+    const placeSuggestions = () => {
+        const caret = input.selectionStart ?? 0;
+        const before = input.value.slice(0, caret);
+        const line = before.split('\n').length - 1;
+        const column = caret - (before.lastIndexOf('\n') + 1);
+        const lineHeight = parseFloat(getComputedStyle(input).lineHeight) || 18;
+
+        caretProbe.textContent = '0';
+
+        const charWidth = caretProbe.getBoundingClientRect().width || 7.2;
+
+        suggestions.moveTo(
+            Math.max(0, column * charWidth - input.scrollLeft),
+            (line + 1) * lineHeight - input.scrollTop + 4
+        );
+    };
+
+    const syncSuggestions = () => {
+        const caret = input.selectionStart ?? input.value.length;
+
+        token = findActiveVariableToken(input.value, caret);
+
+        if (token && suggestions.open(token.query)) {
+            placeSuggestions();
+        }
     };
 
     input.addEventListener('input', () => {
         paint();
         options.onChange(input.value);
+        syncSuggestions();
+    });
+    input.addEventListener('click', syncSuggestions);
+    input.addEventListener('blur', () => {
+        token = null;
+        suggestions.close();
     });
     input.addEventListener('scroll', () => {
         layer.style.transform = `translate(${-input.scrollLeft}px, ${-input.scrollTop}px)`;
         gutter.scrollTop = input.scrollTop;
     });
     input.addEventListener('keydown', (event) => {
+        if (suggestions.handleKey(event)) {
+            return;
+        }
+
         if (event.key === 'Tab' && !event.shiftKey) {
             event.preventDefault();
             const { selectionStart, selectionEnd, value } = input;

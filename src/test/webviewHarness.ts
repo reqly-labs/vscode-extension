@@ -13,6 +13,10 @@ type RequestEditorModule = typeof import('../webview/components/requestEditor');
 
 type VariableInputModule = typeof import('../webview/components/variableInput');
 
+type CodeEditorModule = typeof import('../webview/components/codeEditor');
+
+type HighlightModule = typeof import('../webview/highlight');
+
 export interface WebviewHarness {
     window: JSDOM['window'];
     posted: PanelMessage[];
@@ -21,6 +25,8 @@ export interface WebviewHarness {
     createUrlBar: UrlBarModule['createUrlBar'];
     createRequestEditor: RequestEditorModule['createRequestEditor'];
     createVariableInput: VariableInputModule['createVariableInput'];
+    createEditor: CodeEditorModule['createEditor'];
+    highlight: HighlightModule['highlight'];
     dispose(): void;
 }
 
@@ -74,6 +80,8 @@ export function mountWebview(): WebviewHarness {
         require('../webview/components/requestEditor') as RequestEditorModule;
     const { createVariableInput } =
         require('../webview/components/variableInput') as VariableInputModule;
+    const { createEditor } = require('../webview/components/codeEditor') as CodeEditorModule;
+    const { highlight } = require('../webview/highlight') as HighlightModule;
 
     return {
         window: dom.window,
@@ -83,6 +91,8 @@ export function mountWebview(): WebviewHarness {
         createUrlBar,
         createRequestEditor,
         createVariableInput,
+        createEditor,
+        highlight,
         dispose() {
             for (const [name, value] of saved) {
                 if (value === undefined) {
