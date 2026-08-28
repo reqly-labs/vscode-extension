@@ -109,3 +109,62 @@ suite('languageFor', () => {
         assert.equal(languageFor(''), 'text');
     });
 });
+
+suite('highlight marks variables only when asked', () => {
+    function render(source: string, language: Language, variables: boolean): HTMLElement {
+        host.innerHTML = highlight(source, language, { variables });
+
+        return host;
+    }
+
+    test('leaves tokens alone by default, so a response body is never treated as a template', () => {
+        const rendered = render('{"a":"{{notAVariable}}"}', 'json', false);
+
+        assert.equal(rendered.querySelector('.variable-token'), null);
+        assert.equal(rendered.textContent, '{"a":"{{notAVariable}}"}');
+    });
+
+    test('marks a token sitting in plain text', () => {
+        const rendered = render('{{baseUrl}}/users', 'text', true);
+
+        assert.deepEqual(
+            [...rendered.querySelectorAll('.variable-token')].map((node) => node.textContent),
+            ['{{baseUrl}}']
+        );
+    });
+
+    test('marks a token inside a JSON string without losing the string colour', () => {
+        const rendered = render('{"token":"{{token}}"}', 'json', true);
+        const token = rendered.querySelector('.variable-token');
+
+        assert.equal(token?.textContent, '{{token}}');
+        assert.equal(token?.closest('.tok-string')?.textContent, '"{{token}}"');
+    });
+
+    test('marks a token inside an XML attribute', () => {
+        const rendered = render('<a href="{{baseUrl}}">x</a>', 'xml', true);
+
+        assert.equal(rendered.querySelector('.variable-token')?.textContent, '{{baseUrl}}');
+    });
+
+    test('keeps the text identical whether or not variables are marked', () => {
+        for (const source of [
+            '{"token":"{{token}}","n":1}',
+            '<a href="{{u}}"/>',
+            'plain {{a}} text',
+            '{{a}}{{b}}',
+        ]) {
+            for (const language of ['json', 'xml', 'text'] as Language[]) {
+                assert.equal(render(source, language, true).textContent, source);
+                assert.equal(render(source, language, false).textContent, source);
+            }
+        }
+    });
+
+    test('still neutralises markup when variables are marked', () => {
+        const rendered = render('{{a}}<script>alert(1)</script>', 'json', true);
+
+        assert.equal(rendered.querySelector('script'), null);
+        assert.equal(rendered.textContent, '{{a}}<script>alert(1)</script>');
+    });
+});
