@@ -57,6 +57,29 @@ the wrong row, because nothing anywhere caches which collection a request belong
 stored tree is validated and, if it is ever inconsistent, repaired deterministically and reported
 rather than silently reshaped.
 
+### Environments that follow the project, not the machine
+
+Write `{{baseUrl}}` once and point it at development, staging or production. Values come from three
+places, and the first one that answers wins:
+
+| Scope       | Where it lives             | Good for                                                                                        |
+| ----------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
+| Dynamic     | Built in                   | `{{$guid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`, `{{$randomAlphaNumeric}}` |
+| Environment | One file per environment   | The URL, token or tenant that changes per machine                                               |
+| Collection  | Inside the collection file | Defaults that should travel with the collection                                                 |
+
+An environment overrides the collection, so a collection can ship a sensible default that a machine
+replaces. Define a variable named after a dynamic one and yours wins, which is how you pin a
+timestamp while debugging.
+
+Type `{{` in the URL, in any key or value, in the request body or in the authentication fields and
+the names in scope are offered, filtered as you type. A name that resolves is green; a name nothing
+defines is amber and underlined, so a typo shows before the request goes out rather than after.
+
+Mark a value with the lock and it is kept in the operating system keychain instead of the file.
+Collection variables cannot be marked secret on purpose: that file is meant to be shared, so
+credentials belong in an environment.
+
 ### A request panel wired to your collections
 
 Clicking a request in the sidebar opens it in the panel and links the two. The header shows its name,
@@ -154,16 +177,20 @@ back exactly as you left it in that workspace.
 2. Hit **New Request** to start a loose request, or **New Collection** to group a few together.
 3. Name it inline, pick a method, type a URL, and press `Enter`.
 4. Press `Ctrl+S` to save your changes back to the request.
+5. Need the same request against more than one server? Open the environment picker in the panel
+   header, add an environment, and swap `https://localhost:5208` for `{{baseUrl}}`.
 
 ## Commands
 
-| Command                   | Description                                                           |
-| ------------------------- | --------------------------------------------------------------------- |
-| `Reqly: New Request`      | Creates a request, opens it in the panel, and starts renaming it.     |
-| `Reqly: New Collection`   | Creates a collection and starts renaming it.                          |
-| `Reqly: Open HTTP Client` | Opens the request panel in the editor area.                           |
-| `Reqly: Send Request`     | Sends whatever the panel currently holds.                             |
-| `Reqly: Save Request`     | Writes the panel back to its saved request, asking where if unlinked. |
+| Command                      | Description                                                           |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `Reqly: New Request`         | Creates a request, opens it in the panel, and starts renaming it.     |
+| `Reqly: New Collection`      | Creates a collection and starts renaming it.                          |
+| `Reqly: Open HTTP Client`    | Opens the request panel in the editor area.                           |
+| `Reqly: Send Request`        | Sends whatever the panel currently holds.                             |
+| `Reqly: Save Request`        | Writes the panel back to its saved request, asking where if unlinked. |
+| `Reqly: Manage Environments` | Opens the variables editor for the collection and every environment.  |
+| `Reqly: Select Environment`  | Picks the environment used to resolve `{{variables}}`.                |
 
 ## Keyboard shortcuts
 
@@ -213,7 +240,7 @@ src/
 ├── http/         → the transport: build a request, execute it, decode the response (Node only)
 ├── panel/        → the request panel controller and its HTML shell
 ├── providers/    → the collections sidebar controller and its HTML shell
-├── services/     → persisted state, backed by VS Code Mementos
+├── services/     → collection, environment and secret storage
 ├── utils/        → small shared helpers
 ├── collections/  → the UI that runs inside the sidebar (DOM only, no VS Code API)
 └── webview/      → the UI that runs inside the panel (DOM only, no VS Code API)
@@ -226,6 +253,12 @@ their webviews and own only the DOM. They never share objects, only the typed me
 `src/core/messages.ts` and `src/core/collectionsMessages.ts`, which keeps the boundary explicit and
 every side independently testable. Everything under `src/core` is free of both `vscode` and
 `document`, which is exactly why the test suite can exercise it directly.
+
+Variables follow the same split. `src/core/variables.ts` owns the token grammar, the scope merge and
+the interpolation, with no knowledge of VS Code or the DOM, which is why both the host (resolving a
+request before it is sent) and the webview (painting a token, offering a completion) can share one
+implementation instead of drifting apart. `src/core/environmentFile.ts` owns the on-disk shape, so a
+future importer reuses the same parser the file system already uses.
 
 The collection tree deserves its own note. It lives in `src/core/workspace.ts` as a normalized map of
 nodes plus ordered `childIds`, with no stored parent pointers: a node's parent is always derived, so
@@ -262,8 +295,8 @@ Requests go out through the editor's own HTTP stack, so VS Code's `http.proxy` s
 standard proxy environment variables apply, following whatever `http.proxySupport` is set to.
 
 Credentials are not kept in `settings.json` or in extension state. Bearer tokens, Basic auth
-passwords and API key values go to VS Code's `SecretStorage`, backed by the operating system
-keychain.
+passwords, API key values and any variable marked secret go to VS Code's `SecretStorage`, backed by
+the operating system keychain.
 
 ## Known Issues
 
@@ -274,13 +307,15 @@ keychain.
 - Responses are held in memory while they are read, so the size limit is a real ceiling rather than a
   display threshold. There is no streaming to disk yet.
 - No cookie jar: a `Set-Cookie` on one response is not sent back on the next request.
+- A variable cannot be filled from a previous response yet: that needs a scripting step, which does
+  not exist.
 - No client certificate (mTLS) authentication.
 - No request history yet.
 
 ## Roadmap
 
 - Import and export, including Postman and Insomnia collections.
-- Environment variables and interpolation.
+- Chaining: writing a value from a response into a variable.
 - Multiple request tabs.
 - Request history.
 - `.http` and OpenAPI file import.

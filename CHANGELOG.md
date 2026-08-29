@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-29
+
+Environment variables. Write `{{baseUrl}}` once and point it at development, staging or production
+without editing a single request.
+
+### Added
+
+- **Environments**: named sets of variables, one in use at a time, chosen from the panel header or
+  with `Reqly: Select Environment`. Each one is a JSON file next to your collections, so it can be
+  reviewed and committed like the rest of the project.
+- **Collection variables**: values that live in the collection file itself and travel with it. An
+  environment overrides them, so a collection can ship sensible defaults that a machine can replace.
+- **Dynamic variables**, resolved fresh on every send: `{{$guid}}`, `{{$uuid}}`, `{{$timestamp}}`,
+  `{{$isoTimestamp}}`, `{{$randomInt}}` and `{{$randomAlphaNumeric}}`. Define a variable with the
+  same name and yours wins, so a value can be pinned while debugging.
+- **Secret variables**: mark a value with the lock and it goes to the operating system keychain
+  instead of the file. Collection variables cannot be marked secret, because that file is meant to be
+  shared.
+- `{{name}}` is resolved everywhere a request can carry text: URL, query parameters, headers, all
+  body formats, form and multipart fields, file paths, and authentication.
+- Typing `{{` anywhere offers the names in scope, filtered as you type, with `Enter` or `Tab` to
+  accept and the arrow keys to move. Available in the URL, in every key and value field, in the
+  request body, and in the authentication fields.
+- A name that resolves is painted green; one that nothing defines is painted amber and underlined,
+  so a typo is visible before the request goes out.
+- A variables editor inside the request panel, with the collection and every environment in one
+  place, and the dynamic variables listed so they can be discovered.
+- `Reqly: Manage Environments` and `Reqly: Select Environment` commands.
+
+### Changed
+
+- Sending a request warns which names could not be resolved, and sends the text exactly as written
+  rather than refusing.
+- A variable that refers to another is resolved through, up to eight passes, and a cycle stops
+  instead of hanging.
+
+### Fixed
+
+- The Content-Security-Policy nonce is generated with a cryptographic source in every webview.
+
 ## [1.3.0] - 2026-08-28
 
 Collections are files now. They used to live in a single opaque blob inside VS Code's global state;
@@ -165,7 +205,8 @@ that `localhost` services, self-signed certificates and arbitrary headers all wo
   editor themes.
 - `Ctrl+Alt+Enter` / `Cmd+Alt+Enter` keybinding to send the current request from anywhere in VS Code.
 
-[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.3.0...HEAD
+[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.4.0
 [1.3.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.3.0
 [1.2.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.2.0
 [1.1.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.1.0
