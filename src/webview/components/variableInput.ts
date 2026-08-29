@@ -88,15 +88,30 @@ export function createVariableInput(options: VariableInputOptions): VariableInpu
         'div',
         { class: `variable-input ${options.className ?? ''}`.trim() },
         backdrop,
-        input,
-        suggestions.root
+        input
     );
 
     const sync = () => {
         const caret = input.selectionStart ?? input.value.length;
 
         token = findActiveVariableToken(input.value, caret);
-        root.classList.toggle('is-open', token !== null && suggestions.open(token.query));
+
+        if (!token) {
+            suggestions.close();
+            root.classList.remove('is-open');
+
+            return;
+        }
+
+        const rect = input.getBoundingClientRect();
+
+        root.classList.toggle(
+            'is-open',
+            suggestions.openAt(
+                { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width },
+                token.query
+            )
+        );
     };
 
     const close = () => {
@@ -137,5 +152,10 @@ export function createVariableInput(options: VariableInputOptions): VariableInpu
 
     paint();
 
-    return { root, input, refresh: paint, destroy: close };
+    const destroy = () => {
+        close();
+        suggestions.destroy();
+    };
+
+    return { root, input, refresh: paint, destroy };
 }

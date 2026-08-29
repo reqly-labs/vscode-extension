@@ -161,7 +161,7 @@ export function createEditor(options: {
         },
     });
     const scroller = el('div', { class: 'code-scroll' }, layer, input, caretProbe);
-    const root = el('div', { class: 'code-editor' }, gutter, scroller, suggestions.root);
+    const root = el('div', { class: 'code-editor' }, gutter, scroller);
     const paint = () => {
         const value = input.value;
 
@@ -180,10 +180,11 @@ export function createEditor(options: {
 
         const charWidth = caretProbe.getBoundingClientRect().width || 7.2;
 
-        suggestions.moveTo(
-            Math.max(0, column * charWidth - input.scrollLeft),
-            (line + 1) * lineHeight - input.scrollTop + 4
-        );
+        const rect = input.getBoundingClientRect();
+        const x = rect.left + column * charWidth - input.scrollLeft;
+        const y = rect.top + line * lineHeight - input.scrollTop;
+
+        return { left: x, top: y, bottom: y + lineHeight, width: 260 };
     };
 
     const syncSuggestions = () => {
@@ -191,8 +192,10 @@ export function createEditor(options: {
 
         token = findActiveVariableToken(input.value, caret);
 
-        if (token && suggestions.open(token.query)) {
-            placeSuggestions();
+        if (token) {
+            suggestions.openAt(placeSuggestions(), token.query);
+        } else {
+            suggestions.close();
         }
     };
 

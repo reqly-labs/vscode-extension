@@ -12,11 +12,8 @@ import {
     restoreEnvironments,
     type EnvironmentPersistence,
 } from '../services/EnvironmentService';
-import {
-    EnvironmentStore,
-    environmentFileName,
-    parseEnvironment,
-} from '../services/EnvironmentStore';
+import { parseEnvironmentDocument } from '../core/environmentFile';
+import { EnvironmentStore, environmentFileName } from '../services/EnvironmentStore';
 import { SecretStore } from '../services/SecretStore';
 import { FakeMemento } from './FakeMemento';
 import { FakeSecretStorage } from './FakeSecretStorage';
@@ -337,7 +334,7 @@ suite('environment files', () => {
     });
 
     test('fills in what a hand-edited file left out', () => {
-        const parsed = parseEnvironment({
+        const parsed = parseEnvironmentDocument({
             environment: { id: 'e1', variables: [{ key: 'a' }, 'nonsense'] },
         });
 
@@ -355,7 +352,7 @@ suite('environment files', () => {
 
     test('refuses a payload that is not an environment', () => {
         for (const raw of [null, 3, {}, { environment: {} }, { environment: { id: '' } }]) {
-            assert.equal(parseEnvironment(raw), null, `accepted ${JSON.stringify(raw)}`);
+            assert.equal(parseEnvironmentDocument(raw), null, `accepted ${JSON.stringify(raw)}`);
         }
     });
 });

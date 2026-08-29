@@ -1,62 +1,19 @@
 import * as vscode from 'vscode';
-import { type Environment, type Variable } from '../core/variables';
+import {
+    parseEnvironmentDocument,
+    toEnvironmentDocument,
+    type EnvironmentDocument,
+} from '../core/environmentFile';
+import { type Environment } from '../core/variables';
 import { slugify } from './CollectionStore';
-
-export const ENVIRONMENT_FILE_VERSION = 1;
 
 const PREFIX = 'environment_';
 
 const FILE_SUFFIX = '.json';
 
-export interface EnvironmentDocument {
-    reqly: number;
-    order: number;
-    environment: Environment;
-}
-
 export interface EnvironmentLoad {
     environments: Environment[];
     unreadable: string[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-export function parseEnvironment(raw: unknown): { environment: Environment; order: number } | null {
-    if (!isRecord(raw) || !isRecord(raw.environment)) {
-        return null;
-    }
-
-    const source = raw.environment;
-
-    if (typeof source.id !== 'string' || !source.id) {
-        return null;
-    }
-
-    const createdAt = typeof source.createdAt === 'number' ? source.createdAt : Date.now();
-    const variables = Array.isArray(source.variables) ? source.variables : [];
-
-    return {
-        order: typeof raw.order === 'number' ? raw.order : 0,
-        environment: {
-            id: source.id,
-            name: typeof source.name === 'string' && source.name ? source.name : 'Environment',
-            createdAt,
-            updatedAt: typeof source.updatedAt === 'number' ? source.updatedAt : createdAt,
-            variables: variables.filter(isRecord).map(toVariable),
-        },
-    };
-}
-
-function toVariable(raw: Record<string, unknown>, index: number): Variable {
-    return {
-        id: typeof raw.id === 'string' && raw.id ? raw.id : `v${index}`,
-        key: typeof raw.key === 'string' ? raw.key : '',
-        value: typeof raw.value === 'string' ? raw.value : '',
-        enabled: raw.enabled !== false,
-        secret: raw.secret === true,
-    };
 }
 
 export function environmentFileName(environment: Environment): string {
@@ -89,7 +46,7 @@ export class EnvironmentStore {
 
                 this.written.set(name, text);
 
-                const document = parseEnvironment(JSON.parse(text));
+                const document = parseEnvironmentDocument(JSON.parse(text));
 
                 if (document) {
                     parsed.push(document);
@@ -112,11 +69,7 @@ export class EnvironmentStore {
         const wanted = new Map<string, string>();
 
         environments.forEach((environment, index) => {
-            const document: EnvironmentDocument = {
-                reqly: ENVIRONMENT_FILE_VERSION,
-                order: index,
-                environment,
-            };
+            const document: EnvironmentDocument = toEnvironmentDocument(environment, index);
 
             wanted.set(environmentFileName(environment), `${JSON.stringify(document, null, 4)}\n`);
         });

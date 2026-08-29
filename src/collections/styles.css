@@ -177,13 +177,16 @@ body {
 }
 
 .row-method {
+    align-items: center;
+    display: inline-flex;
     flex-shrink: 0;
-    width: 42px;
     font-family: var(--font-mono);
     font-size: 9.5px;
     font-weight: 700;
+    justify-content: flex-end;
     letter-spacing: 0.04em;
-    text-align: right;
+    line-height: 1;
+    width: 42px;
 }
 
 .row-label {

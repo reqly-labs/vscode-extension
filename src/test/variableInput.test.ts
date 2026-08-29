@@ -61,20 +61,28 @@ suite('typing a variable into a field', () => {
         input.dispatchEvent(new harness.window.KeyboardEvent('keydown', { key, bubbles: true }));
     }
 
+    function popup(): HTMLElement {
+        const node = harness.window.document.querySelector<HTMLElement>('.variable-popup');
+
+        assert.ok(node, 'expected the suggestion overlay');
+
+        return node;
+    }
+
     function options(): string[] {
-        return [...root.querySelectorAll('.variable-option-key')].map(
+        return [...popup().querySelectorAll('.variable-option-key')].map(
             (node) => node.textContent ?? ''
         );
     }
 
     test('stays closed while there is no open token', () => {
         type('https://api');
-        assert.equal(root.classList.contains('is-open'), false);
+        assert.equal(popup().classList.contains('is-open'), false);
     });
 
     test('opens as soon as the braces are typed', () => {
         type('{{');
-        assert.equal(root.classList.contains('is-open'), true);
+        assert.equal(popup().classList.contains('is-open'), true);
         assert.deepEqual(options(), ['apiKey', 'basePath', 'baseUrl', 'token']);
     });
 
@@ -85,13 +93,13 @@ suite('typing a variable into a field', () => {
 
     test('leaves out a disabled variable', () => {
         type('{{leg');
-        assert.equal(root.classList.contains('is-open'), false);
+        assert.equal(popup().classList.contains('is-open'), false);
     });
 
     test('hides the value of a secret variable', () => {
         type('{{api');
 
-        const value = root.querySelector('.variable-option-value');
+        const value = popup().querySelector('.variable-option-value');
 
         assert.equal(value?.textContent, '••••••');
     });
@@ -99,7 +107,7 @@ suite('typing a variable into a field', () => {
     test('shows the value of an ordinary variable', () => {
         type('{{token');
 
-        const value = root.querySelector('.variable-option-value');
+        const value = popup().querySelector('.variable-option-value');
 
         assert.equal(value?.textContent, 'abc123');
     });
@@ -110,7 +118,7 @@ suite('typing a variable into a field', () => {
 
         assert.equal(input.value, 'https://{{basePath}}');
         assert.equal(latest, 'https://{{basePath}}');
-        assert.equal(root.classList.contains('is-open'), false);
+        assert.equal(popup().classList.contains('is-open'), false);
     });
 
     test('walks the list with the arrow keys', () => {
@@ -140,7 +148,7 @@ suite('typing a variable into a field', () => {
         type('{{base');
         press('Escape');
 
-        assert.equal(root.classList.contains('is-open'), false);
+        assert.equal(popup().classList.contains('is-open'), false);
         assert.equal(input.value, '{{base');
     });
 
@@ -160,7 +168,7 @@ suite('typing a variable into a field', () => {
 
     test('closes once the token is complete', () => {
         type('{{baseUrl}}');
-        assert.equal(root.classList.contains('is-open'), false);
+        assert.equal(popup().classList.contains('is-open'), false);
     });
 });
 
@@ -428,5 +436,141 @@ suite('the styled box stays on the element the stylesheet targets', () => {
         });
 
         assert.ok(header.querySelector('.request-tools .env-menu'));
+    });
+});
+
+suite('the suggestion list floats above the panel', () => {
+    let harness: WebviewHarness;
+
+    setup(() => {
+        harness = mountWebview();
+        harness.store.state.environment = {
+            activeId: 'e1',
+            environments: [
+                { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: VARIABLES },
+            ],
+        };
+    });
+
+    teardown(() => {
+        harness.dispose();
+    });
+
+    function fieldIn(className: string): HTMLInputElement {
+        const handle = harness.createVariableInput({
+            value: '',
+            className,
+            ariaLabel: 'Field',
+            onInput: () => {},
+        });
+
+        harness.window.document.getElementById('root')?.appendChild(handle.root);
+
+        return handle.input;
+    }
+
+    function typeInto(input: HTMLInputElement, value: string): void {
+        input.value = value;
+        input.setSelectionRange(value.length, value.length);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    test('lives outside the field so no ancestor can clip or resize it', () => {
+        const input = fieldIn('field kv-value');
+
+        typeInto(input, '{{');
+
+        const popup = harness.window.document.querySelector('.variable-popup');
+
+        assert.ok(popup);
+        assert.equal(popup.parentElement, harness.window.document.body);
+        assert.equal(popup.closest('.variable-input'), null, 'the list is still inside the field');
+        assert.equal(popup.closest('.url-shell'), null);
+    });
+
+    test('keeps one list open at a time', () => {
+        const first = fieldIn('field kv-key');
+        const second = fieldIn('field kv-value');
+
+        typeInto(first, '{{');
+        typeInto(second, '{{');
+
+        const open = harness.window.document.querySelectorAll('.variable-popup.is-open');
+
+        assert.equal(open.length, 1);
+    });
+
+    test('shows the name and a trimmed value, hiding a secret', () => {
+        const input = fieldIn('field kv-value');
+
+        typeInto(input, '{{');
+
+        const options = [
+            ...harness.window.document.querySelectorAll('.variable-popup.is-open .variable-option'),
+        ];
+        const secret = options.find(
+            (node) => node.querySelector('.variable-option-key')?.textContent === 'apiKey'
+        );
+
+        assert.ok(secret);
+        assert.equal(secret.querySelector('.variable-option-value')?.textContent, '••••••');
+        assert.equal(secret.getAttribute('title'), 'apiKey');
+    });
+
+    test('takes the list away when the field is thrown away', () => {
+        const handle = harness.createVariableInput({
+            value: '',
+            className: 'field',
+            ariaLabel: 'Field',
+            onInput: () => {},
+        });
+
+        harness.window.document.getElementById('root')?.appendChild(handle.root);
+        assert.equal(harness.window.document.querySelectorAll('.variable-popup').length, 1);
+
+        handle.destroy();
+        assert.equal(harness.window.document.querySelectorAll('.variable-popup').length, 0);
+    });
+});
+
+suite('variables reach the auth fields', () => {
+    let harness: WebviewHarness;
+
+    setup(() => {
+        harness = mountWebview();
+        harness.store.state.environment = {
+            activeId: 'e1',
+            environments: [
+                { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: VARIABLES },
+            ],
+        };
+    });
+
+    teardown(() => {
+        harness.dispose();
+    });
+
+    test('an auth text field paints tokens and suggests names', () => {
+        harness.store.hydrate(
+            webviewState({
+                auth: { type: 'bearer', token: 'x', prefix: '{{token}}' },
+            }),
+            { id: null, name: '', location: '' }
+        );
+
+        const editor = harness.createRequestEditor();
+
+        harness.window.document.getElementById('root')?.appendChild(editor);
+
+        const tabs = [...harness.window.document.querySelectorAll<HTMLButtonElement>('.tab')];
+
+        tabs.find((tab) => (tab.textContent ?? '').startsWith('Auth'))?.click();
+
+        const painted = harness.window.document.querySelector(
+            '.pane .variable-input .variable-token'
+        );
+
+        assert.ok(painted, 'the auth field should paint the token');
+        assert.equal(painted.textContent, '{{token}}');
     });
 });

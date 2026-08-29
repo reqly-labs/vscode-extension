@@ -3,6 +3,7 @@ import type { Auth, AuthApiKey, AuthBasic, AuthBearer, AuthType } from '../../co
 import { el, replace } from '../dom';
 import { icon } from '../icons';
 import { createSelect, type SelectHandle } from './select';
+import { createVariableInput } from './variableInput';
 
 const AUTH_LABELS: Record<AuthType, string> = {
     none: 'No Auth',
@@ -37,14 +38,14 @@ function textInput(
     value: string,
     placeholder: string,
     onInput: (value: string) => void
-): HTMLInputElement {
-    return el('input', {
-        class: 'field',
+): HTMLElement {
+    return createVariableInput({
         value,
+        className: 'field',
         placeholder,
-        spellcheck: false,
-        on: { input: (event) => onInput((event.target as HTMLInputElement).value) },
-    });
+        ariaLabel: placeholder,
+        onInput,
+    }).root;
 }
 
 function secretInput(

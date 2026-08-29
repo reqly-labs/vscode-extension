@@ -61,7 +61,7 @@ suite('variables in the request body', () => {
     }
 
     function popup(): HTMLElement {
-        const node = root.querySelector<HTMLElement>('.variable-popup');
+        const node = harness.window.document.querySelector<HTMLElement>('.variable-popup');
 
         assert.ok(node);
 
