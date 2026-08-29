@@ -5,6 +5,7 @@ import {
     type ActiveVariableToken,
 } from '../../core/variables';
 import { el, replace } from '../dom';
+import { knownVariableNames } from './variableSuggestions';
 import { createSuggestionList } from './variableSuggestions';
 
 export interface VariableInputHandle {
@@ -31,6 +32,7 @@ export function highlightTokens(value: string): Node[] {
         return [document.createTextNode(value)];
     }
 
+    const known = knownVariableNames();
     const parts: Node[] = [];
     let cursor = 0;
 
@@ -39,7 +41,12 @@ export function highlightTokens(value: string): Node[] {
             parts.push(document.createTextNode(value.slice(cursor, token.start)));
         }
 
-        parts.push(el('span', { class: 'variable-token', text: token.text }));
+        parts.push(
+            el('span', {
+                class: known.has(token.name) ? 'variable-token' : 'variable-token is-unknown',
+                text: token.text,
+            })
+        );
         cursor = token.end;
     }
 

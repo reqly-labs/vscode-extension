@@ -221,6 +221,30 @@ suite('showing a variable in a field', () => {
         assert.equal(backdrop.textContent, '{{baseUrl}}/users/{{id}}');
     });
 
+    test('marks a name the active environment does not define', () => {
+        const backdrop = backdropOf('{{baseUrl}}/{{nope}}');
+        const tokens = [...backdrop.querySelectorAll('.variable-token')];
+
+        assert.deepEqual(
+            tokens.map((node) => [node.textContent, node.classList.contains('is-unknown')]),
+            [
+                ['{{baseUrl}}', false],
+                ['{{nope}}', true],
+            ]
+        );
+    });
+
+    test('marks every name when no environment is chosen', () => {
+        harness.store.state.environment = { activeId: null, environments: [] };
+
+        const backdrop = backdropOf('{{baseUrl}}');
+
+        assert.equal(
+            backdrop.querySelector('.variable-token')?.classList.contains('is-unknown'),
+            true
+        );
+    });
+
     test('paints nothing when there is no token', () => {
         const backdrop = backdropOf('https://api.test/users');
 

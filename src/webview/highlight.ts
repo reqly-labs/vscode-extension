@@ -5,6 +5,13 @@ export type Language = 'json' | 'xml' | 'text';
 
 export interface HighlightOptions {
     variables?: boolean;
+    known?: ReadonlySet<string>;
+}
+
+let knownNames: ReadonlySet<string> = new Set();
+
+function tokenClass(name: string): string {
+    return knownNames.has(name) ? 'variable-token' : 'variable-token is-unknown';
 }
 
 function paint(source: string, variables: boolean): string {
@@ -23,7 +30,7 @@ function paint(source: string, variables: boolean): string {
 
     for (const token of tokens) {
         result += escapeHtml(source.slice(cursor, token.start));
-        result += `<span class="variable-token">${escapeHtml(token.text)}</span>`;
+        result += `<span class="${tokenClass(token.name)}">${escapeHtml(token.text)}</span>`;
         cursor = token.end;
     }
 
@@ -101,6 +108,8 @@ export function highlight(
     options: HighlightOptions = {}
 ): string {
     const variables = options.variables === true;
+
+    knownNames = options.known ?? new Set();
 
     if (source.length > MAX_HIGHLIGHT_CHARS) {
         return escapeHtml(source);

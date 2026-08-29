@@ -1825,3 +1825,9 @@ code {
     margin: 0;
     padding: 12px 4px;
 }
+
+.variable-token.is-unknown {
+    color: var(--color-warning, #f0a02a);
+    text-decoration: underline dotted currentcolor;
+    text-underline-offset: 2px;
+}

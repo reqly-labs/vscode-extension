@@ -85,9 +85,55 @@ suite('variables in the request body', () => {
         );
     });
 
+    test('marks a name the environment does not define', () => {
+        type('{"a":"{{token}}","b":"{{missing}}"}');
+
+        assert.deepEqual(
+            [...layer().querySelectorAll('.variable-token')].map((node) => [
+                node.textContent,
+                node.classList.contains('is-unknown'),
+            ]),
+            [
+                ['{{token}}', false],
+                ['{{missing}}', true],
+            ]
+        );
+    });
+
     test('keeps the body text exactly as typed', () => {
         type('{"a":"{{token}}","b":2}');
         assert.equal(layer().textContent?.trimEnd(), '{"a":"{{token}}","b":2}');
+    });
+
+    function pressKey(key: string): boolean {
+        return !textarea.dispatchEvent(
+            new harness.window.KeyboardEvent('keydown', {
+                key,
+                bubbles: true,
+                cancelable: true,
+            })
+        );
+    }
+
+    test('suggests variables when the braces are typed key by key', () => {
+        textarea.value = '';
+        textarea.setSelectionRange(0, 0);
+
+        assert.equal(pressKey('{'), true, 'the editor should auto-close the brace');
+        assert.equal(pressKey('{'), true, 'the editor should auto-close the second brace');
+        assert.equal(textarea.value, '{{}}', 'the editor should have closed both braces');
+        assert.equal(
+            popup().classList.contains('is-open'),
+            true,
+            'auto-closing the braces must still offer the variables'
+        );
+    });
+
+    test('completes without doubling the auto-closed braces', () => {
+        type('{{tok}}', 5);
+        press('Enter');
+
+        assert.equal(textarea.value, '{{token}}');
     });
 
     test('suggests variables once the braces are typed', () => {

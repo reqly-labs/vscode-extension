@@ -1,7 +1,7 @@
 import { completeVariableToken, findActiveVariableToken } from '../../core/variables';
 import { el } from '../dom';
 import { highlight, type Language } from '../highlight';
-import { createSuggestionList } from './variableSuggestions';
+import { createSuggestionList, knownVariableNames } from './variableSuggestions';
 
 const OPEN_TO_CLOSE: Record<string, string> = { '{': '}', '[': ']', '(': ')', '"': '"', "'": "'" };
 const OPENERS = new Set(Object.keys(OPEN_TO_CLOSE));
@@ -166,7 +166,7 @@ export function createEditor(options: {
         const value = input.value;
 
         gutter.textContent = gutterFor(countLines(value));
-        layer.innerHTML = `${highlight(value, language, { variables: true })}\n`;
+        layer.innerHTML = `${highlight(value, language, { variables: true, known: knownVariableNames() })}\n`;
     };
 
     const placeSuggestions = () => {
@@ -226,6 +226,7 @@ export function createEditor(options: {
             input.selectionStart = input.selectionEnd = selectionStart + INDENT_UNIT.length;
             paint();
             options.onChange(input.value);
+            syncSuggestions();
 
             return;
         }
@@ -234,6 +235,7 @@ export function createEditor(options: {
             event.preventDefault();
             paint();
             options.onChange(input.value);
+            syncSuggestions();
         }
     });
     paint();

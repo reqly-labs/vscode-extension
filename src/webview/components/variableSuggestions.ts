@@ -26,6 +26,14 @@ const MAX_HEIGHT = 220;
 
 let closeOpenList: (() => void) | null = null;
 
+export function knownVariableNames(): Set<string> {
+    return new Set(
+        activeVariables()
+            .filter((variable) => variable.enabled && variable.key.trim())
+            .map((variable) => variable.key.trim())
+    );
+}
+
 function activeVariables(): Variable[] {
     const { activeId, environments } = state.environment;
 
