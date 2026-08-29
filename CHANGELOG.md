@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-29
+
+### Fixed
+
+- Editing a variable no longer takes the focus away. The variables editor rebuilt its whole table on
+  every change, so tabbing from one field to the next dropped you onto nothing and each field had to
+  be clicked again. Edits are now applied to the row that changed, and the panel only redraws when
+  something other than a value moves.
+
 ## [1.4.0] - 2026-08-29
 
 Environment variables. Write `{{baseUrl}}` once and point it at development, staging or production
@@ -205,7 +214,8 @@ that `localhost` services, self-signed certificates and arbitrary headers all wo
   editor themes.
 - `Ctrl+Alt+Enter` / `Cmd+Alt+Enter` keybinding to send the current request from anywhere in VS Code.
 
-[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.4.0...HEAD
+[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.4.1
 [1.4.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.4.0
 [1.3.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.3.0
 [1.2.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.2.0

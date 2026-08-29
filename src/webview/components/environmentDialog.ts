@@ -51,9 +51,25 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
     const overlay = el('div', { class: 'dialog-overlay' });
     const root = el('div', { class: 'dialog-host' }, overlay);
 
+    const variableList = el('div', { class: 'env-vars' });
+
     let selectedId: string | null = null;
     let creating = false;
     let confirmingId: string | null = null;
+    let signature = '';
+
+    function currentSignature(): string {
+        return scopes()
+            .map((scope) => {
+                const marks = scopeVariables(scope)
+                    .map((entry) => `${entry.id}:${entry.enabled ? 1 : 0}:${entry.secret ? 1 : 0}`)
+                    .join(',');
+
+                return `${scopeId(scope)}|${scopeName(scope)}|${marks}`;
+            })
+            .join(';')
+            .concat(`#${state.environment.activeId ?? ''}`);
+    }
 
     const close = () => {
         creating = false;
@@ -77,7 +93,11 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
             post({ type: 'saveVariables', id: scope.environment.id, variables });
         }
 
-        paintDetail();
+        signature = currentSignature();
+
+        if (!creating) {
+            paintList();
+        }
     };
 
     function nameRow(scope: Scope): HTMLElement {
@@ -186,15 +206,23 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
         return field;
     }
 
-    function variableRow(scope: Scope, variable: Variable, index: number): HTMLElement {
-        const current = scopeVariables(scope);
-        const update = (patch: Partial<Variable>) => {
-            const next = current.map((entry, position) =>
+    function variableRow(scope: Scope, variable: Variable): HTMLElement {
+        const indexOf = () => scopeVariables(scope).findIndex((entry) => entry.id === variable.id);
+        const write = (patch: Partial<Variable>, extra?: Variable) => {
+            const index = indexOf();
+
+            if (index === -1) {
+                return;
+            }
+
+            const next = scopeVariables(scope).map((entry, position) =>
                 position === index ? { ...entry, ...patch } : entry
             );
 
-            if (patch.key !== undefined && index === current.length - 1 && patch.key) {
-                next.push(emptyVariable());
+            Object.assign(variable, patch);
+
+            if (extra) {
+                next.push(extra);
             }
 
             saveVariables(scope, next);
@@ -207,7 +235,7 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
             type: variable.secret ? 'password' : 'text',
             placeholder: variable.secret ? 'Kept in the keychain' : 'Value',
             attrs: { 'aria-label': 'Variable value' },
-            on: { change: () => update({ value: value.value }) },
+            on: { change: () => write({ value: value.value }) },
         });
         const key = el('input', {
             class: 'field env-var-key',
@@ -215,10 +243,54 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
             spellcheck: false,
             placeholder: 'Variable name',
             attrs: { 'aria-label': 'Variable name' },
-            on: { change: () => update({ key: key.value }) },
-        });
+            on: {
+                change: () => {
+                    const isLast = indexOf() === scopeVariables(scope).length - 1;
+                    const grow = isLast && key.value.trim().length > 0;
+                    const fresh = grow ? emptyVariable() : undefined;
 
-        return el(
+                    write({ key: key.value }, fresh);
+
+                    if (fresh) {
+                        variableList.appendChild(variableRow(scope, fresh));
+                    }
+                },
+            },
+        });
+        const secret =
+            scope.kind === 'environment'
+                ? el(
+                      'button',
+                      {
+                          class: `env-secret${variable.secret ? ' is-on' : ''}`,
+                          type: 'button',
+                          attrs: { 'aria-pressed': variable.secret ? 'true' : 'false' },
+                          on: {
+                              click: () => {
+                                  const next = !variable.secret;
+
+                                  write({ secret: next });
+                                  secret.classList.toggle('is-on', next);
+                                  secret.setAttribute('aria-pressed', next ? 'true' : 'false');
+                                  secret.title = next
+                                      ? 'Kept in the operating system keychain'
+                                      : 'Keep this value in the operating system keychain';
+                                  value.type = next ? 'password' : 'text';
+                                  value.placeholder = next ? 'Kept in the keychain' : 'Value';
+                              },
+                          },
+                      },
+                      icon('lock')
+                  )
+                : el('span', { class: 'env-secret is-off' });
+
+        if (scope.kind === 'environment') {
+            secret.title = variable.secret
+                ? 'Kept in the operating system keychain'
+                : 'Keep this value in the operating system keychain';
+        }
+
+        const row = el(
             'div',
             { class: `env-var${variable.enabled ? '' : ' is-disabled'}` },
             el('input', {
@@ -227,38 +299,44 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
                 checked: variable.enabled,
                 attrs: { 'aria-label': 'Enable variable' },
                 on: {
-                    change: (event) =>
-                        update({ enabled: (event.target as HTMLInputElement).checked }),
+                    change: (event) => {
+                        const enabled = (event.target as HTMLInputElement).checked;
+
+                        write({ enabled });
+                        row.classList.toggle('is-disabled', !enabled);
+                    },
                 },
             }),
             key,
             value,
-            scope.kind === 'environment'
-                ? el(
-                      'button',
-                      {
-                          class: `env-secret${variable.secret ? ' is-on' : ''}`,
-                          type: 'button',
-                          title: variable.secret
-                              ? 'Kept in the operating system keychain'
-                              : 'Keep this value in the operating system keychain',
-                          attrs: { 'aria-pressed': variable.secret ? 'true' : 'false' },
-                          on: { click: () => update({ secret: !variable.secret }) },
-                      },
-                      icon('lock')
-                  )
-                : el('span', { class: 'env-secret is-off' }),
+            secret,
             iconButton(
                 'trash',
                 'Remove variable',
-                () =>
+                () => {
+                    const index = indexOf();
+
+                    if (index === -1) {
+                        return;
+                    }
+
                     saveVariables(
                         scope,
-                        current.filter((_, position) => position !== index)
-                    ),
+                        scopeVariables(scope).filter((_, position) => position !== index)
+                    );
+                    row.remove();
+
+                    if (variableList.childElementCount === 0) {
+                        const fresh = emptyVariable();
+
+                        variableList.appendChild(variableRow(scope, fresh));
+                    }
+                },
                 'is-danger'
             )
         );
+
+        return row;
     }
 
     function paintDetail(): void {
@@ -375,11 +453,11 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
                 el('span'),
                 el('span')
             ),
-            el(
-                'div',
-                { class: 'env-vars' },
-                ...rows.map((variable, index) => variableRow(scope, variable, index))
-            ),
+            (() => {
+                replace(variableList, ...rows.map((variable) => variableRow(scope, variable)));
+
+                return variableList;
+            })(),
             el(
                 'div',
                 { class: 'env-dynamic' },
@@ -397,6 +475,7 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
     }
 
     function paint(): void {
+        signature = currentSignature();
         paintList();
         paintDetail();
     }
@@ -426,9 +505,18 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
         }
     });
     on('environment', () => {
-        if (root.classList.contains('is-open')) {
-            paint();
+        if (!root.classList.contains('is-open')) {
+            return;
         }
+
+        const next = currentSignature();
+
+        if (next === signature) {
+            return;
+        }
+
+        signature = next;
+        paint();
     });
 
     return {
