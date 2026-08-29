@@ -29,6 +29,8 @@ suite('variables in the request body', () => {
                     ],
                 },
             ],
+            collection: null,
+            dynamic: [],
         };
 
         const editor = harness.createEditor({

@@ -9,9 +9,17 @@ export interface WebviewState {
     activeRequestId: string | null;
 }
 
+export interface CollectionScope {
+    id: string;
+    name: string;
+    variables: Variable[];
+}
+
 export interface EnvironmentInfo {
     activeId: string | null;
     environments: Environment[];
+    collection: CollectionScope | null;
+    dynamic: { name: string; description: string }[];
 }
 
 export interface ActiveRequestInfo {
@@ -142,6 +150,11 @@ export type PanelMessage =
       }
     | {
           type: 'saveVariables';
+          id: string;
+          variables: Variable[];
+      }
+    | {
+          type: 'saveCollectionVariables';
           id: string;
           variables: Variable[];
       };

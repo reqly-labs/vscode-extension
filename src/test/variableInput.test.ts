@@ -34,6 +34,8 @@ suite('typing a variable into a field', () => {
                     variables: VARIABLES,
                 },
             ],
+            collection: null,
+            dynamic: [],
         };
 
         const handle = harness.createVariableInput({
@@ -188,6 +190,8 @@ suite('showing a variable in a field', () => {
                     variables: VARIABLES,
                 },
             ],
+            collection: null,
+            dynamic: [],
         };
     });
 
@@ -235,7 +239,12 @@ suite('showing a variable in a field', () => {
     });
 
     test('marks every name when no environment is chosen', () => {
-        harness.store.state.environment = { activeId: null, environments: [] };
+        harness.store.state.environment = {
+            activeId: null,
+            environments: [],
+            collection: null,
+            dynamic: [],
+        };
 
         const backdrop = backdropOf('{{baseUrl}}');
 
@@ -288,6 +297,8 @@ suite('variables reach the request panel', () => {
                     variables: VARIABLES,
                 },
             ],
+            collection: null,
+            dynamic: [],
         };
 
         const bar = harness.createUrlBar({
@@ -322,6 +333,8 @@ suite('variables reach the request panel', () => {
                 { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: [] },
                 { id: 'e2', name: 'Prod', createdAt: 0, updatedAt: 0, variables: [] },
             ],
+            collection: null,
+            dynamic: [],
         };
 
         const header = harness.createRequestHeader({
@@ -348,6 +361,8 @@ suite('variables reach the request panel', () => {
         harness.store.state.environment = {
             activeId: null,
             environments: [{ id: 'e2', name: 'Prod', createdAt: 0, updatedAt: 0, variables: [] }],
+            collection: null,
+            dynamic: [],
         };
 
         const header = harness.createRequestHeader({
@@ -380,6 +395,8 @@ suite('the styled box stays on the element the stylesheet targets', () => {
             environments: [
                 { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: VARIABLES },
             ],
+            collection: null,
+            dynamic: [],
         };
     });
 
@@ -473,6 +490,8 @@ suite('the suggestion list floats above the panel', () => {
             environments: [
                 { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: VARIABLES },
             ],
+            collection: null,
+            dynamic: [],
         };
     });
 
@@ -567,6 +586,8 @@ suite('variables reach the auth fields', () => {
             environments: [
                 { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: VARIABLES },
             ],
+            collection: null,
+            dynamic: [],
         };
     });
 
@@ -596,5 +617,96 @@ suite('variables reach the auth fields', () => {
 
         assert.ok(painted, 'the auth field should paint the token');
         assert.equal(painted.textContent, '{{token}}');
+    });
+});
+
+suite('the three scopes reach the fields', () => {
+    let harness: WebviewHarness;
+
+    setup(() => {
+        harness = mountWebview();
+        harness.store.state.environment = {
+            activeId: 'e1',
+            environments: [
+                {
+                    id: 'e1',
+                    name: 'Dev',
+                    createdAt: 0,
+                    updatedAt: 0,
+                    variables: [variable('baseUrl', 'https://dev.test')],
+                },
+            ],
+            collection: {
+                id: 'c1',
+                name: 'Catalogue',
+                variables: [
+                    variable('basePath', '/v1'),
+                    variable('baseUrl', 'https://collection.test'),
+                ],
+            },
+            dynamic: [
+                { name: '$guid', description: 'A random UUID v4' },
+                { name: '$timestamp', description: 'The current time in Unix seconds' },
+            ],
+        };
+    });
+
+    teardown(() => {
+        harness.dispose();
+    });
+
+    function suggestionsFor(text: string): string[] {
+        const handle = harness.createVariableInput({
+            value: '',
+            className: 'field',
+            ariaLabel: 'Field',
+            onInput: () => {},
+        });
+
+        harness.window.document.getElementById('root')?.appendChild(handle.root);
+        handle.input.value = text;
+        handle.input.setSelectionRange(text.length, text.length);
+        handle.input.dispatchEvent(new Event('input', { bubbles: true }));
+
+        return [
+            ...harness.window.document.querySelectorAll(
+                '.variable-popup.is-open .variable-option-key'
+            ),
+        ].map((node) => node.textContent ?? '');
+    }
+
+    test('offers collection, environment and dynamic names together', () => {
+        assert.deepEqual(suggestionsFor('{{'), ['$guid', '$timestamp', 'basePath', 'baseUrl']);
+    });
+
+    test('offers a dynamic name when its prefix is typed', () => {
+        assert.deepEqual(suggestionsFor('{{$time'), ['$timestamp']);
+    });
+
+    test('lists a name defined in both scopes only once', () => {
+        assert.deepEqual(suggestionsFor('{{baseU'), ['baseUrl']);
+    });
+
+    test('treats a dynamic name as known when painting', () => {
+        const handle = harness.createVariableInput({
+            value: '{{$guid}}/{{basePath}}/{{nope}}',
+            className: 'field',
+            ariaLabel: 'Field',
+            onInput: () => {},
+        });
+
+        harness.window.document.getElementById('root')?.appendChild(handle.root);
+
+        assert.deepEqual(
+            [...handle.root.querySelectorAll('.variable-token')].map((node) => [
+                node.textContent,
+                node.classList.contains('is-unknown'),
+            ]),
+            [
+                ['{{$guid}}', false],
+                ['{{basePath}}', false],
+                ['{{nope}}', true],
+            ]
+        );
     });
 });

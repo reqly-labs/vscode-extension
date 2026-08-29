@@ -27,17 +27,43 @@ const MAX_HEIGHT = 220;
 let closeOpenList: (() => void) | null = null;
 
 export function knownVariableNames(): Set<string> {
-    return new Set(
-        activeVariables()
+    const names = new Set(
+        scopedVariables()
             .filter((variable) => variable.enabled && variable.key.trim())
             .map((variable) => variable.key.trim())
     );
+
+    for (const entry of state.environment.dynamic) {
+        names.add(entry.name);
+    }
+
+    return names;
 }
 
-function activeVariables(): Variable[] {
-    const { activeId, environments } = state.environment;
+function scopedVariables(): Variable[] {
+    const { activeId, environments, collection } = state.environment;
+    const fromEnvironment = environments.find((entry) => entry.id === activeId)?.variables ?? [];
+    const chosen = new Map<string, Variable>();
 
-    return environments.find((entry) => entry.id === activeId)?.variables ?? [];
+    for (const variable of [...(collection?.variables ?? []), ...fromEnvironment]) {
+        const key = variable.key.trim();
+
+        if (variable.enabled && key) {
+            chosen.set(key, variable);
+        }
+    }
+
+    return [...chosen.values()];
+}
+
+function dynamicAsVariables(): Variable[] {
+    return state.environment.dynamic.map((entry) => ({
+        id: entry.name,
+        key: entry.name,
+        value: entry.description,
+        enabled: true,
+        secret: false,
+    }));
 }
 
 export function createSuggestionList(options: {
@@ -130,7 +156,7 @@ export function createSuggestionList(options: {
         isOpen: () => root.classList.contains('is-open'),
 
         openAt(anchor: SuggestionAnchor, query: string) {
-            matches = matchVariables(activeVariables(), query);
+            matches = matchVariables([...scopedVariables(), ...dynamicAsVariables()], query);
 
             if (matches.length === 0) {
                 close();

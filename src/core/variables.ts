@@ -1,3 +1,4 @@
+import { isDynamicVariable, resolveDynamicVariable } from './dynamicVariables';
 import { createId, type FormField, type KeyValue, type RequestSnapshot } from './types';
 
 export const MAX_INTERPOLATION_DEPTH = 8;
@@ -128,7 +129,15 @@ export function variableValues(environment: Environment | undefined): Record<str
     return values;
 }
 
-export function interpolate(text: string, values: Record<string, string>): string {
+export interface InterpolateOptions {
+    dynamic?: boolean;
+}
+
+export function interpolate(
+    text: string,
+    values: Record<string, string>,
+    options: InterpolateOptions = {}
+): string {
     if (!text.includes('{{')) {
         return text;
     }
@@ -139,7 +148,10 @@ export function interpolate(text: string, values: Record<string, string>): strin
         let replaced = false;
         const next = current.replace(TOKEN, (token) => {
             const name = token.slice(2, -2).trim();
-            const value = values[name];
+            const value =
+                options.dynamic && isDynamicVariable(name)
+                    ? resolveDynamicVariable(name)
+                    : values[name];
 
             if (value === undefined || value === token) {
                 return token;
@@ -161,67 +173,78 @@ export function interpolate(text: string, values: Record<string, string>): strin
 }
 
 export function unresolvedVariables(text: string, values: Record<string, string>): string[] {
-    return findVariableTokens(interpolate(text, values))
+    return findVariableTokens(text)
         .map((token) => token.name)
-        .filter((name) => name.length > 0);
+        .filter((name) => name.length > 0 && !isDynamicVariable(name))
+        .filter((name) => interpolate(`{{${name}}}`, values) === `{{${name}}}`);
 }
 
-function interpolatePairs<T extends KeyValue>(items: T[], values: Record<string, string>): T[] {
+function interpolatePairs<T extends KeyValue>(
+    items: T[],
+    values: Record<string, string>,
+    options: InterpolateOptions
+): T[] {
     return items.map((item) => ({
         ...item,
-        key: interpolate(item.key, values),
-        value: interpolate(item.value, values),
+        key: interpolate(item.key, values, options),
+        value: interpolate(item.value, values, options),
     }));
 }
 
-function interpolateFields(items: FormField[], values: Record<string, string>): FormField[] {
+function interpolateFields(
+    items: FormField[],
+    values: Record<string, string>,
+    options: InterpolateOptions
+): FormField[] {
     return items.map((item) => ({
         ...item,
-        key: interpolate(item.key, values),
-        value: item.type === 'file' ? item.value : interpolate(item.value, values),
-        filePath: item.filePath ? interpolate(item.filePath, values) : item.filePath,
+        key: interpolate(item.key, values, options),
+        value: item.type === 'file' ? item.value : interpolate(item.value, values, options),
+        filePath: item.filePath ? interpolate(item.filePath, values, options) : item.filePath,
     }));
 }
 
 export function interpolateSnapshot(
     snapshot: RequestSnapshot,
-    values: Record<string, string>
+    values: Record<string, string>,
+    options: InterpolateOptions = { dynamic: true }
 ): RequestSnapshot {
     return {
         ...snapshot,
-        url: interpolate(snapshot.url, values),
-        body: interpolate(snapshot.body, values),
-        binaryPath: interpolate(snapshot.binaryPath, values),
-        params: interpolatePairs(snapshot.params, values),
-        headers: interpolatePairs(snapshot.headers, values),
-        formBody: interpolatePairs(snapshot.formBody, values),
-        multipartBody: interpolateFields(snapshot.multipartBody, values),
-        auth: interpolateAuth(snapshot.auth, values),
+        url: interpolate(snapshot.url, values, options),
+        body: interpolate(snapshot.body, values, options),
+        binaryPath: interpolate(snapshot.binaryPath, values, options),
+        params: interpolatePairs(snapshot.params, values, options),
+        headers: interpolatePairs(snapshot.headers, values, options),
+        formBody: interpolatePairs(snapshot.formBody, values, options),
+        multipartBody: interpolateFields(snapshot.multipartBody, values, options),
+        auth: interpolateAuth(snapshot.auth, values, options),
     };
 }
 
 function interpolateAuth(
     auth: RequestSnapshot['auth'],
-    values: Record<string, string>
+    values: Record<string, string>,
+    options: InterpolateOptions
 ): RequestSnapshot['auth'] {
     switch (auth.type) {
         case 'bearer':
             return {
                 ...auth,
-                token: interpolate(auth.token, values),
-                prefix: interpolate(auth.prefix, values),
+                token: interpolate(auth.token, values, options),
+                prefix: interpolate(auth.prefix, values, options),
             };
         case 'basic':
             return {
                 ...auth,
-                username: interpolate(auth.username, values),
-                password: interpolate(auth.password, values),
+                username: interpolate(auth.username, values, options),
+                password: interpolate(auth.password, values, options),
             };
         case 'api-key':
             return {
                 ...auth,
-                key: interpolate(auth.key, values),
-                value: interpolate(auth.value, values),
+                key: interpolate(auth.key, values, options),
+                value: interpolate(auth.value, values, options),
             };
         default:
             return auth;

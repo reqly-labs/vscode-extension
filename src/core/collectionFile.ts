@@ -1,4 +1,5 @@
 import type { RequestSnapshot } from './types';
+import type { Variable } from './variables';
 import {
     createWorkspace,
     isGroup,
@@ -19,6 +20,7 @@ export interface DocumentNode {
     updatedAt?: number;
     children?: DocumentNode[];
     snapshot?: RequestSnapshot;
+    variables?: Variable[];
 }
 
 export interface CollectionDocument {
@@ -63,6 +65,7 @@ export function toDocument(
 
         return {
             ...base,
+            ...(node.variables && node.variables.length > 0 ? { variables: node.variables } : {}),
             children: node.childIds
                 .map((childId) => build(childId, depth + 1))
                 .filter((child): child is DocumentNode => child !== null),
@@ -115,6 +118,7 @@ export function parseDocument(raw: unknown): ParsedDocument | null {
             name,
             createdAt,
             updatedAt,
+            ...(Array.isArray(value.variables) ? { variables: value.variables as Variable[] } : {}),
             childIds: children
                 .map((child) => collect(child, depth + 1))
                 .filter((id): id is string => id !== null),

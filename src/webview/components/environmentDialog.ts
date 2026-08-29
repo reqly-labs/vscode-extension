@@ -9,8 +9,40 @@ export interface EnvironmentDialogHandle {
     open(): void;
 }
 
-function activeEnvironments(): Environment[] {
-    return state.environment.environments;
+type Scope =
+    | { kind: 'collection'; id: string; name: string; variables: Variable[] }
+    | { kind: 'environment'; environment: Environment };
+
+function scopes(): Scope[] {
+    const { collection, environments } = state.environment;
+    const list: Scope[] = [];
+
+    if (collection) {
+        list.push({
+            kind: 'collection',
+            id: collection.id,
+            name: collection.name,
+            variables: collection.variables,
+        });
+    }
+
+    for (const environment of environments) {
+        list.push({ kind: 'environment', environment });
+    }
+
+    return list;
+}
+
+function scopeId(scope: Scope): string {
+    return scope.kind === 'collection' ? scope.id : scope.environment.id;
+}
+
+function scopeName(scope: Scope): string {
+    return scope.kind === 'collection' ? scope.name : scope.environment.name;
+}
+
+function scopeVariables(scope: Scope): Variable[] {
+    return scope.kind === 'collection' ? scope.variables : scope.environment.variables;
 }
 
 export function createEnvironmentDialog(): EnvironmentDialogHandle {
@@ -29,54 +61,71 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
         root.classList.remove('is-open');
     };
 
-    const selected = (): Environment | undefined => {
-        const all = activeEnvironments();
+    const selected = (): Scope | undefined => {
+        const all = scopes();
 
-        return all.find((entry) => entry.id === selectedId) ?? all[0];
+        return all.find((entry) => scopeId(entry) === selectedId) ?? all[0];
     };
 
-    const saveVariables = (environment: Environment, variables: Variable[]) => {
-        environment.variables = variables;
-        post({ type: 'saveVariables', id: environment.id, variables });
+    const saveVariables = (scope: Scope, variables: Variable[]) => {
+        if (scope.kind === 'collection') {
+            scope.variables = variables;
+            state.environment.collection = { id: scope.id, name: scope.name, variables };
+            post({ type: 'saveCollectionVariables', id: scope.id, variables });
+        } else {
+            scope.environment.variables = variables;
+            post({ type: 'saveVariables', id: scope.environment.id, variables });
+        }
+
         paintDetail();
     };
 
-    function nameRow(environment: Environment): HTMLElement {
-        const isActive = environment.id === state.environment.activeId;
-        const row = el(
+    function nameRow(scope: Scope): HTMLElement {
+        const id = scopeId(scope);
+        const current = selected();
+        const isActive =
+            scope.kind === 'environment' && scope.environment.id === state.environment.activeId;
+
+        return el(
             'div',
             {
-                class: `env-row${environment.id === selected()?.id ? ' is-selected' : ''}`,
+                class: `env-row${current && scopeId(current) === id ? ' is-selected' : ''}`,
                 on: {
                     click: () => {
-                        selectedId = environment.id;
+                        selectedId = id;
                         confirmingId = null;
                         paint();
                     },
                 },
             },
-            el('span', {
-                class: `env-dot${isActive ? ' is-on' : ''}`,
-                title: isActive ? 'Active environment' : '',
-            }),
-            el('span', { class: 'env-row-name', text: environment.name }),
+            scope.kind === 'collection'
+                ? el('span', { class: 'env-scope-mark', title: 'Collection variables' })
+                : el('span', {
+                      class: `env-dot${isActive ? ' is-on' : ''}`,
+                      title: isActive ? 'Active environment' : '',
+                  }),
+            el('span', { class: 'env-row-name', text: scopeName(scope) }),
             el('span', {
                 class: 'env-row-count',
-                text: String(environment.variables.filter((entry) => entry.key.trim()).length),
+                text: String(scopeVariables(scope).filter((entry) => entry.key.trim()).length),
             })
         );
-
-        return row;
     }
 
     function paintList(): void {
-        const all = activeEnvironments();
+        const all = scopes();
+        const collections = all.filter((scope) => scope.kind === 'collection');
+        const environments = all.filter((scope) => scope.kind === 'environment');
 
         replace(
             list,
-            ...(all.length > 0
-                ? all.map(nameRow)
-                : [el('p', { class: 'env-blank', text: 'No environments yet.' })]),
+            ...(collections.length > 0
+                ? [el('p', { class: 'env-group', text: 'Collection' }), ...collections.map(nameRow)]
+                : []),
+            el('p', { class: 'env-group', text: 'Environments' }),
+            ...(environments.length > 0
+                ? environments.map(nameRow)
+                : [el('p', { class: 'env-blank', text: 'None yet.' })]),
             creating ? newNameField() : createButton()
         );
     }
@@ -137,21 +186,18 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
         return field;
     }
 
-    function variableRow(environment: Environment, variable: Variable, index: number): HTMLElement {
+    function variableRow(scope: Scope, variable: Variable, index: number): HTMLElement {
+        const current = scopeVariables(scope);
         const update = (patch: Partial<Variable>) => {
-            const next = environment.variables.map((entry, position) =>
+            const next = current.map((entry, position) =>
                 position === index ? { ...entry, ...patch } : entry
             );
 
-            if (
-                patch.key !== undefined &&
-                index === environment.variables.length - 1 &&
-                patch.key
-            ) {
+            if (patch.key !== undefined && index === current.length - 1 && patch.key) {
                 next.push(emptyVariable());
             }
 
-            saveVariables(environment, next);
+            saveVariables(scope, next);
         };
 
         const value = el('input', {
@@ -187,26 +233,28 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
             }),
             key,
             value,
-            el(
-                'button',
-                {
-                    class: `env-secret${variable.secret ? ' is-on' : ''}`,
-                    type: 'button',
-                    title: variable.secret
-                        ? 'Kept in the operating system keychain'
-                        : 'Keep this value in the operating system keychain',
-                    attrs: { 'aria-pressed': variable.secret ? 'true' : 'false' },
-                    on: { click: () => update({ secret: !variable.secret }) },
-                },
-                icon('lock')
-            ),
+            scope.kind === 'environment'
+                ? el(
+                      'button',
+                      {
+                          class: `env-secret${variable.secret ? ' is-on' : ''}`,
+                          type: 'button',
+                          title: variable.secret
+                              ? 'Kept in the operating system keychain'
+                              : 'Keep this value in the operating system keychain',
+                          attrs: { 'aria-pressed': variable.secret ? 'true' : 'false' },
+                          on: { click: () => update({ secret: !variable.secret }) },
+                      },
+                      icon('lock')
+                  )
+                : el('span', { class: 'env-secret is-off' }),
             iconButton(
                 'trash',
                 'Remove variable',
                 () =>
                     saveVariables(
-                        environment,
-                        environment.variables.filter((_, position) => position !== index)
+                        scope,
+                        current.filter((_, position) => position !== index)
                     ),
                 'is-danger'
             )
@@ -214,9 +262,9 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
     }
 
     function paintDetail(): void {
-        const environment = selected();
+        const scope = selected();
 
-        if (!environment) {
+        if (!scope) {
             replace(
                 detail,
                 el('p', {
@@ -228,85 +276,95 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
             return;
         }
 
-        const isActive = environment.id === state.environment.activeId;
-        const rows = environment.variables.length > 0 ? environment.variables : [emptyVariable()];
+        const variables = scopeVariables(scope);
+        const rows = variables.length > 0 ? variables : [emptyVariable()];
+        const isEnvironment = scope.kind === 'environment';
+        const isActive = isEnvironment && scope.environment.id === state.environment.activeId;
 
         replace(
             detail,
             el(
                 'div',
                 { class: 'env-detail-head' },
-                el('input', {
-                    class: 'env-title-field',
-                    value: environment.name,
-                    spellcheck: false,
-                    attrs: { 'aria-label': 'Environment name' },
-                    on: {
-                        change: (event) => {
-                            const name = (event.target as HTMLInputElement).value.trim();
+                isEnvironment
+                    ? el('input', {
+                          class: 'env-title-field',
+                          value: scope.environment.name,
+                          spellcheck: false,
+                          attrs: { 'aria-label': 'Environment name' },
+                          on: {
+                              change: (event) => {
+                                  const name = (event.target as HTMLInputElement).value.trim();
 
-                            if (name && name !== environment.name) {
-                                post({ type: 'renameEnvironment', id: environment.id, name });
-                            }
-                        },
-                    },
-                }),
-                el(
-                    'div',
-                    { class: 'env-detail-actions' },
-                    el(
-                        'button',
-                        {
-                            class: `env-use${isActive ? ' is-on' : ''}`,
-                            type: 'button',
-                            on: {
-                                click: () =>
-                                    post({
-                                        type: 'selectEnvironment',
-                                        id: isActive ? null : environment.id,
-                                    }),
-                            },
-                        },
-                        isActive ? 'In use' : 'Use'
-                    ),
-                    iconButton('copy', 'Duplicate environment', () =>
-                        post({ type: 'duplicateEnvironment', id: environment.id })
-                    ),
-                    confirmingId === environment.id
-                        ? el(
+                                  if (name && name !== scope.environment.name) {
+                                      post({
+                                          type: 'renameEnvironment',
+                                          id: scope.environment.id,
+                                          name,
+                                      });
+                                  }
+                              },
+                          },
+                      })
+                    : el('h3', { class: 'env-title-static', text: scopeName(scope) }),
+                isEnvironment
+                    ? el(
+                          'div',
+                          { class: 'env-detail-actions' },
+                          el(
                               'button',
                               {
-                                  class: 'env-confirm',
+                                  class: `env-use${isActive ? ' is-on' : ''}`,
                                   type: 'button',
                                   on: {
-                                      click: () => {
+                                      click: () =>
                                           post({
-                                              type: 'removeEnvironment',
-                                              id: environment.id,
-                                          });
-                                          confirmingId = null;
-                                      },
+                                              type: 'selectEnvironment',
+                                              id: isActive ? null : scope.environment.id,
+                                          }),
                                   },
                               },
-                              'Delete?'
-                          )
-                        : iconButton(
-                              'trash',
-                              'Delete environment',
-                              () => {
-                                  confirmingId = environment.id;
-                                  paintDetail();
-                              },
-                              'is-danger'
-                          )
-                )
+                              isActive ? 'In use' : 'Use'
+                          ),
+                          iconButton('copy', 'Duplicate environment', () =>
+                              post({ type: 'duplicateEnvironment', id: scope.environment.id })
+                          ),
+                          confirmingId === scope.environment.id
+                              ? el(
+                                    'button',
+                                    {
+                                        class: 'env-confirm',
+                                        type: 'button',
+                                        on: {
+                                            click: () => {
+                                                post({
+                                                    type: 'removeEnvironment',
+                                                    id: scope.environment.id,
+                                                });
+                                                confirmingId = null;
+                                            },
+                                        },
+                                    },
+                                    'Delete?'
+                                )
+                              : iconButton(
+                                    'trash',
+                                    'Delete environment',
+                                    () => {
+                                        confirmingId = scope.environment.id;
+                                        paintDetail();
+                                    },
+                                    'is-danger'
+                                )
+                      )
+                    : el('span', { class: 'env-badge', text: 'Travels with the collection' })
             ),
             el(
                 'p',
                 { class: 'env-hint' },
-                'Write ',
-                el('code', { text: '{{name}}' }),
-                ' anywhere in a request to use one of these. A value marked with the lock is kept in the operating system keychain, never in the collection file.'
+                isEnvironment
+                    ? 'Values here override the collection. A value marked with the lock is kept in the operating system keychain, never in a file.'
+                    : 'Values here are saved in the collection file and shared with anyone who opens it, so keep credentials in an environment instead.'
             ),
             el(
                 'div',
@@ -320,7 +378,20 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
             el(
                 'div',
                 { class: 'env-vars' },
-                ...rows.map((variable, index) => variableRow(environment, variable, index))
+                ...rows.map((variable, index) => variableRow(scope, variable, index))
+            ),
+            el(
+                'div',
+                { class: 'env-dynamic' },
+                el('p', { class: 'env-group', text: 'Always available' }),
+                ...state.environment.dynamic.map((entry) =>
+                    el(
+                        'div',
+                        { class: 'env-dynamic-row' },
+                        el('code', { class: 'env-dynamic-name', text: `{{${entry.name}}}` }),
+                        el('span', { class: 'env-dynamic-text', text: entry.description })
+                    )
+                )
             )
         );
     }
@@ -363,7 +434,9 @@ export function createEnvironmentDialog(): EnvironmentDialogHandle {
     return {
         root,
         open() {
-            selectedId = state.environment.activeId ?? activeEnvironments()[0]?.id ?? null;
+            const all = scopes();
+
+            selectedId = state.environment.activeId ?? (all.length > 0 ? scopeId(all[0]) : null);
             confirmingId = null;
             creating = false;
             root.classList.add('is-open');

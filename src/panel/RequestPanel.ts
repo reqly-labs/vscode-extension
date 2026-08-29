@@ -9,8 +9,9 @@ import type {
     WebviewState,
 } from '../core/messages';
 import type { RequestSnapshot } from '../core/types';
+import { DYNAMIC_VARIABLES } from '../core/dynamicVariables';
 import { interpolateSnapshot, unresolvedInSnapshot } from '../core/variables';
-import { ancestorsOf, getRequest, requestLabel } from '../core/workspace';
+import { ancestorsOf, getRequest, requestLabel, rootCollectionOf } from '../core/workspace';
 import { BuildError, buildRequest } from '../http/buildRequest';
 import { decodeResponse } from '../http/decodeResponse';
 import { executeRequest, TransportError } from '../http/executeRequest';
@@ -175,10 +176,43 @@ export class RequestPanel {
     }
 
     describeEnvironment(): EnvironmentInfo {
+        const collection = this.activeCollection();
+
         return {
             activeId: this.deps.environments.activeId,
             environments: [...this.deps.environments.environments],
+            collection: collection
+                ? {
+                      id: collection.id,
+                      name: collection.name,
+                      variables: collection.variables ?? [],
+                  }
+                : null,
+            dynamic: DYNAMIC_VARIABLES.map((entry) => ({ ...entry })),
         };
+    }
+
+    private activeCollection() {
+        if (!this.activeRequestId) {
+            return undefined;
+        }
+
+        return rootCollectionOf(this.deps.workspaceService.workspace, this.activeRequestId);
+    }
+
+    private resolvedValues(): Record<string, string> {
+        const collection = this.activeCollection();
+        const fromCollection: Record<string, string> = {};
+
+        for (const variable of collection?.variables ?? []) {
+            const key = variable.key.trim();
+
+            if (variable.enabled && key) {
+                fromCollection[key] = variable.value;
+            }
+        }
+
+        return { ...fromCollection, ...this.deps.environments.values };
     }
 
     sendEnvironment(): void {
@@ -294,6 +328,10 @@ export class RequestPanel {
             case 'saveVariables':
                 await this.deps.environments.replaceVariables(message.id, message.variables);
                 break;
+            case 'saveCollectionVariables':
+                await this.deps.workspaceService.setVariables(message.id, message.variables);
+                this.sendEnvironment();
+                break;
         }
     }
 
@@ -393,7 +431,7 @@ export class RequestPanel {
 
         this.inFlight = controller;
         try {
-            const values = this.deps.environments.values;
+            const values = this.resolvedValues();
             const missing = unresolvedInSnapshot(message.snapshot, values);
 
             if (missing.length > 0) {

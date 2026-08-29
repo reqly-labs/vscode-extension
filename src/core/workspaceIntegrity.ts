@@ -1,4 +1,5 @@
 import { createSnapshot, type FormField, type KeyValue, type RequestSnapshot } from './types';
+import type { Variable } from './variables';
 import {
     createWorkspace,
     isGroup,
@@ -121,10 +122,23 @@ function normalizeNode(id: string, value: unknown, now: number): WorkspaceNode |
             childIds,
             createdAt,
             updatedAt,
+            ...(Array.isArray(value.variables)
+                ? { variables: normalizeVariables(value.variables) }
+                : {}),
         };
     }
 
     return null;
+}
+
+function normalizeVariables(raw: unknown[]): Variable[] {
+    return raw.filter(isRecord).map((entry, index) => ({
+        id: typeof entry.id === 'string' && entry.id ? entry.id : `v${index}`,
+        key: typeof entry.key === 'string' ? entry.key : '',
+        value: typeof entry.value === 'string' ? entry.value : '',
+        enabled: entry.enabled !== false,
+        secret: false,
+    }));
 }
 
 export function normalizeWorkspace(raw: unknown): NormalizeResult {

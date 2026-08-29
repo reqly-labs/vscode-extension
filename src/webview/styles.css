@@ -1831,3 +1831,68 @@ code {
     text-decoration: underline dotted currentcolor;
     text-underline-offset: 2px;
 }
+
+.env-group {
+    color: var(--color-text-subtle);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    margin: 8px 0 2px;
+    padding: 0 8px;
+    text-transform: uppercase;
+}
+
+.env-group:first-child {
+    margin-top: 0;
+}
+
+.env-scope-mark {
+    background: var(--color-primary);
+    border-radius: 2px;
+    flex: none;
+    height: 8px;
+    width: 8px;
+}
+
+.env-title-static {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    padding: 3px 6px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.env-secret.is-off {
+    display: inline-block;
+    height: 27px;
+    width: 27px;
+}
+
+.env-dynamic {
+    border-top: 1px solid var(--color-border);
+    margin-top: 6px;
+    padding-top: 8px;
+}
+
+.env-dynamic-row {
+    align-items: baseline;
+    display: flex;
+    gap: 10px;
+    padding: 2px 0;
+}
+
+.env-dynamic-name {
+    color: var(--color-success);
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    width: 168px;
+}
+
+.env-dynamic-text {
+    color: var(--color-text-subtle);
+    font-size: 11px;
+}

@@ -1,4 +1,5 @@
 import { createSnapshot, type RequestSnapshot } from './types';
+import type { Variable } from './variables';
 
 export type NodeKind = 'collection' | 'folder' | 'request';
 
@@ -14,6 +15,7 @@ interface NodeBase {
 export interface GroupNode extends NodeBase {
     kind: 'collection' | 'folder';
     childIds: string[];
+    variables?: Variable[];
 }
 
 export interface RequestNode extends NodeBase {
@@ -514,4 +516,35 @@ export function requestLabel(node: RequestNode): string {
     } catch {
         return url.length > 28 ? `${url.slice(0, 28)}…` : url;
     }
+}
+
+export function setGroupVariables(
+    workspace: Workspace,
+    id: string,
+    variables: Variable[]
+): WorkspaceResult {
+    const node = workspace.nodes[id];
+
+    if (!isGroup(node)) {
+        return { ok: false, reason: 'That collection no longer exists.' };
+    }
+
+    return {
+        ok: true,
+        id,
+        workspace: {
+            ...workspace,
+            nodes: {
+                ...workspace.nodes,
+                [id]: { ...node, variables, updatedAt: Date.now() },
+            },
+        },
+    };
+}
+
+export function rootCollectionOf(workspace: Workspace, id: string): GroupNode | undefined {
+    const chain = ancestorsOf(workspace, id);
+    const root = chain[0];
+
+    return root?.kind === 'collection' ? root : undefined;
 }

@@ -1,5 +1,6 @@
 import { collectSecrets, redactWorkspace, restoreWorkspace } from '../core/secrets';
 import type { RequestSnapshot } from '../core/types';
+import type { Variable } from '../core/variables';
 import {
     createCollection,
     createFolder,
@@ -9,6 +10,7 @@ import {
     duplicateNode,
     moveNode,
     renameNode,
+    setGroupVariables,
     updateRequestSnapshot,
     type ParentId,
     type Workspace,
@@ -120,6 +122,10 @@ export class WorkspaceService {
 
     async duplicate(id: string): Promise<WorkspaceResult> {
         return this.apply(duplicateNode(this.state, id));
+    }
+
+    async setVariables(id: string, variables: Variable[]): Promise<WorkspaceResult> {
+        return this.apply(setGroupVariables(this.state, id, variables));
     }
 
     async updateSnapshot(id: string, snapshot: RequestSnapshot): Promise<WorkspaceResult> {

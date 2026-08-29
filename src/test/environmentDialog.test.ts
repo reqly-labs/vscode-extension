@@ -20,7 +20,12 @@ suite('managing environments inside the panel', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = { activeId: 'e1', environments: [DEV, PROD] };
+        harness.store.state.environment = {
+            activeId: 'e1',
+            environments: [DEV, PROD],
+            collection: null,
+            dynamic: [],
+        };
         dialog = harness.createEnvironmentDialog();
         harness.window.document.getElementById('root')?.appendChild(dialog.root);
     });
