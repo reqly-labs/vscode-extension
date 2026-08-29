@@ -24,7 +24,6 @@ export interface PanelDependencies {
     workspaceService: WorkspaceService;
     environments: EnvironmentService;
     onActiveChanged?: () => void;
-    onManageEnvironments?: () => void;
 }
 
 export class RequestPanel {
@@ -34,7 +33,7 @@ export class RequestPanel {
     private inFlight: AbortController | undefined;
     private lastBody: Buffer | undefined;
     private ready = false;
-    private pending: 'send' | 'save' | undefined;
+    private pending: 'send' | 'save' | 'environments' | undefined;
     private activeRequestId: string | null = null;
     private constructor(
         private readonly panel: vscode.WebviewPanel,
@@ -144,6 +143,18 @@ export class RequestPanel {
         this.send({ type: 'command', name: 'send' });
     }
 
+    triggerEnvironments(): void {
+        this.panel.reveal(this.panel.viewColumn);
+
+        if (!this.ready) {
+            this.pending = 'environments';
+
+            return;
+        }
+
+        this.send({ type: 'command', name: 'environments' });
+    }
+
     triggerSave(): void {
         this.panel.reveal(this.panel.viewColumn);
         if (!this.ready) {
@@ -164,14 +175,9 @@ export class RequestPanel {
     }
 
     describeEnvironment(): EnvironmentInfo {
-        const { environments } = this.deps;
-        const active = environments.active;
-
         return {
-            id: active?.id ?? null,
-            name: active?.name ?? '',
-            names: environments.environments.map((entry) => ({ id: entry.id, name: entry.name })),
-            variables: active?.variables ?? [],
+            activeId: this.deps.environments.activeId,
+            environments: [...this.deps.environments.environments],
         };
     }
 
@@ -273,8 +279,20 @@ export class RequestPanel {
             case 'selectEnvironment':
                 await this.deps.environments.setActive(message.id);
                 break;
-            case 'manageEnvironments':
-                this.deps.onManageEnvironments?.();
+            case 'createEnvironment':
+                await this.deps.environments.create(message.name);
+                break;
+            case 'renameEnvironment':
+                await this.deps.environments.rename(message.id, message.name);
+                break;
+            case 'duplicateEnvironment':
+                await this.deps.environments.duplicate(message.id);
+                break;
+            case 'removeEnvironment':
+                await this.deps.environments.remove(message.id);
+                break;
+            case 'saveVariables':
+                await this.deps.environments.replaceVariables(message.id, message.variables);
                 break;
         }
     }

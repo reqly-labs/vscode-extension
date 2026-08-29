@@ -3,7 +3,7 @@ import { el, replace } from '../dom';
 import { icon } from '../icons';
 import { on, state } from '../store';
 
-export function createEnvironmentPicker(): { root: HTMLElement } {
+export function createEnvironmentPicker(options: { onManage: () => void }): { root: HTMLElement } {
     const label = el('span', { class: 'env-pick-label' });
     const list = el('div', { class: 'menu-list' });
     const trigger = el(
@@ -34,26 +34,27 @@ export function createEnvironmentPicker(): { root: HTMLElement } {
         post({ type: 'selectEnvironment', id });
     };
     const paint = () => {
-        const { environment } = state;
+        const { activeId, environments } = state.environment;
+        const active = environments.find((entry) => entry.id === activeId);
 
-        label.textContent = environment.name || 'No environment';
-        trigger.classList.toggle('is-set', environment.id !== null);
+        label.textContent = active?.name ?? 'No environment';
+        trigger.classList.toggle('is-set', active !== undefined);
         replace(
             list,
             el(
                 'button',
                 {
-                    class: `menu-item${environment.id === null ? ' is-selected' : ''}`,
+                    class: `menu-item${activeId === null ? ' is-selected' : ''}`,
                     type: 'button',
                     on: { click: () => choose(null) },
                 },
                 'No environment'
             ),
-            ...environment.names.map((entry) =>
+            ...environments.map((entry) =>
                 el(
                     'button',
                     {
-                        class: `menu-item${entry.id === environment.id ? ' is-selected' : ''}`,
+                        class: `menu-item${entry.id === activeId ? ' is-selected' : ''}`,
                         type: 'button',
                         on: { click: () => choose(entry.id) },
                     },
@@ -69,7 +70,7 @@ export function createEnvironmentPicker(): { root: HTMLElement } {
                     on: {
                         click: () => {
                             root.classList.remove('is-open');
-                            post({ type: 'manageEnvironments' });
+                            options.onManage();
                         },
                     },
                 },

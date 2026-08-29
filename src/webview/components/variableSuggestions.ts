@@ -78,7 +78,10 @@ export function createSuggestionList(options: {
         isOpen: () => root.classList.contains('is-open'),
 
         open(query: string) {
-            matches = matchVariables(state.environment.variables, query);
+            const { activeId, environments } = state.environment;
+            const active = environments.find((entry) => entry.id === activeId);
+
+            matches = matchVariables(active?.variables ?? [], query);
 
             if (matches.length === 0) {
                 close();

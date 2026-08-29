@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { readCertificateFiles, useAdditionalCertificates } from './http/certificates';
-import { EnvironmentPanel } from './panel/EnvironmentPanel';
 import { RequestPanel, type PanelDependencies } from './panel/RequestPanel';
 import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
 import { CollectionStore } from './services/CollectionStore';
@@ -52,7 +51,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         workspaceService,
         environments,
         onActiveChanged: () => collectionsView.refresh(),
-        onManageEnvironments: () => EnvironmentPanel.show(context, environments),
     };
 
     context.subscriptions.push(
@@ -99,7 +97,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             RequestPanel.show(context, deps).triggerSave();
         }),
         vscode.commands.registerCommand('reqly.manageEnvironments', () => {
-            EnvironmentPanel.show(context, environments);
+            RequestPanel.show(context, deps).triggerEnvironments();
         }),
         vscode.commands.registerCommand('reqly.selectEnvironment', async () => {
             await pickEnvironment(environments);

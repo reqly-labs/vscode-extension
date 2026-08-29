@@ -15,13 +15,19 @@ suite('variables in the request body', () => {
     setup(() => {
         harness = mountWebview();
         harness.store.state.environment = {
-            id: 'e1',
-            name: 'Dev',
-            names: [{ id: 'e1', name: 'Dev' }],
-            variables: [
-                variable('token', 'abc123'),
-                variable('tokenId', '7'),
-                variable('baseUrl', 'https://api.dev.test'),
+            activeId: 'e1',
+            environments: [
+                {
+                    id: 'e1',
+                    name: 'Dev',
+                    createdAt: 0,
+                    updatedAt: 0,
+                    variables: [
+                        variable('token', 'abc123'),
+                        variable('tokenId', '7'),
+                        variable('baseUrl', 'https://api.dev.test'),
+                    ],
+                },
             ],
         };
 

@@ -1,5 +1,5 @@
 import type { HttpResponse, RequestError, RequestSettings, RequestSnapshot } from './types';
-import type { Variable } from './variables';
+import type { Environment, Variable } from './variables';
 
 export interface WebviewState {
     snapshot: RequestSnapshot;
@@ -10,10 +10,8 @@ export interface WebviewState {
 }
 
 export interface EnvironmentInfo {
-    id: string | null;
-    name: string;
-    names: { id: string; name: string }[];
-    variables: Variable[];
+    activeId: string | null;
+    environments: Environment[];
 }
 
 export interface ActiveRequestInfo {
@@ -70,7 +68,7 @@ export type HostMessage =
       }
     | {
           type: 'command';
-          name: 'send' | 'cancel' | 'save';
+          name: 'send' | 'cancel' | 'save' | 'environments';
       };
 
 export type PanelMessage =
@@ -126,5 +124,24 @@ export type PanelMessage =
           id: string | null;
       }
     | {
-          type: 'manageEnvironments';
+          type: 'createEnvironment';
+          name: string;
+      }
+    | {
+          type: 'renameEnvironment';
+          id: string;
+          name: string;
+      }
+    | {
+          type: 'duplicateEnvironment';
+          id: string;
+      }
+    | {
+          type: 'removeEnvironment';
+          id: string;
+      }
+    | {
+          type: 'saveVariables';
+          id: string;
+          variables: Variable[];
       };

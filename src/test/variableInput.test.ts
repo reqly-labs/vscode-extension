@@ -24,10 +24,16 @@ suite('typing a variable into a field', () => {
     setup(() => {
         harness = mountWebview();
         harness.store.state.environment = {
-            id: 'e1',
-            name: 'Dev',
-            names: [{ id: 'e1', name: 'Dev' }],
-            variables: VARIABLES,
+            activeId: 'e1',
+            environments: [
+                {
+                    id: 'e1',
+                    name: 'Dev',
+                    createdAt: 0,
+                    updatedAt: 0,
+                    variables: VARIABLES,
+                },
+            ],
         };
 
         const handle = harness.createVariableInput({
@@ -164,10 +170,16 @@ suite('showing a variable in a field', () => {
     setup(() => {
         harness = mountWebview();
         harness.store.state.environment = {
-            id: 'e1',
-            name: 'Dev',
-            names: [],
-            variables: VARIABLES,
+            activeId: 'e1',
+            environments: [
+                {
+                    id: 'e1',
+                    name: 'Dev',
+                    createdAt: 0,
+                    updatedAt: 0,
+                    variables: VARIABLES,
+                },
+            ],
         };
     });
 
@@ -234,10 +246,16 @@ suite('variables reach the request panel', () => {
             location: '',
         });
         harness.store.state.environment = {
-            id: 'e1',
-            name: 'Dev',
-            names: [{ id: 'e1', name: 'Dev' }],
-            variables: VARIABLES,
+            activeId: 'e1',
+            environments: [
+                {
+                    id: 'e1',
+                    name: 'Dev',
+                    createdAt: 0,
+                    updatedAt: 0,
+                    variables: VARIABLES,
+                },
+            ],
         };
 
         const bar = harness.createUrlBar({
@@ -267,16 +285,17 @@ suite('variables reach the request panel', () => {
     test('offers the environments it was told about', () => {
         harness.store.hydrate(webviewState({}, null), { id: null, name: '', location: '' });
         harness.store.state.environment = {
-            id: 'e1',
-            name: 'Dev',
-            names: [
-                { id: 'e1', name: 'Dev' },
-                { id: 'e2', name: 'Prod' },
+            activeId: 'e1',
+            environments: [
+                { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: [] },
+                { id: 'e2', name: 'Prod', createdAt: 0, updatedAt: 0, variables: [] },
             ],
-            variables: [],
         };
 
-        const header = harness.createRequestHeader({ onSave: () => {} });
+        const header = harness.createRequestHeader({
+            onSave: () => {},
+            onManageEnvironments: () => {},
+        });
 
         harness.window.document.getElementById('root')?.appendChild(header);
         harness.store.emit('environment');
@@ -295,13 +314,14 @@ suite('variables reach the request panel', () => {
     test('asks the host to switch environment when one is picked', () => {
         harness.store.hydrate(webviewState({}, null), { id: null, name: '', location: '' });
         harness.store.state.environment = {
-            id: null,
-            name: '',
-            names: [{ id: 'e2', name: 'Prod' }],
-            variables: [],
+            activeId: null,
+            environments: [{ id: 'e2', name: 'Prod', createdAt: 0, updatedAt: 0, variables: [] }],
         };
 
-        const header = harness.createRequestHeader({ onSave: () => {} });
+        const header = harness.createRequestHeader({
+            onSave: () => {},
+            onManageEnvironments: () => {},
+        });
 
         harness.window.document.getElementById('root')?.appendChild(header);
         harness.store.emit('environment');
@@ -324,10 +344,10 @@ suite('the styled box stays on the element the stylesheet targets', () => {
     setup(() => {
         harness = mountWebview();
         harness.store.state.environment = {
-            id: null,
-            name: '',
-            names: [],
-            variables: VARIABLES,
+            activeId: 'e1',
+            environments: [
+                { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: VARIABLES },
+            ],
         };
     });
 
@@ -402,7 +422,10 @@ suite('the styled box stays on the element the stylesheet targets', () => {
 
         assert.equal(bar.querySelector('.env-menu'), null);
 
-        const header = harness.createRequestHeader({ onSave: () => {} });
+        const header = harness.createRequestHeader({
+            onSave: () => {},
+            onManageEnvironments: () => {},
+        });
 
         assert.ok(header.querySelector('.request-tools .env-menu'));
     });

@@ -1,6 +1,7 @@
 import type { HostMessage } from '../core/messages';
 import { cancel, send } from './actions';
 import { flushPersist, post } from './bridge';
+import { createEnvironmentDialog } from './components/environmentDialog';
 import { createRequestEditor } from './components/requestEditor';
 import { createRequestHeader, requestSave } from './components/requestHeader';
 import { createResponseView } from './components/responseView';
@@ -11,6 +12,8 @@ import { emit, hydrate, markSaved, setActive, setEnvironment, state } from './st
 import './styles.css';
 
 const root = document.getElementById('root') as HTMLElement;
+
+let openEnvironments: () => void = () => {};
 
 function buildTopBar(mascotUri: string): HTMLElement {
     return el(
@@ -35,11 +38,18 @@ function buildTopBar(mascotUri: string): HTMLElement {
 }
 
 function mount(mascotUri: string): void {
-    const header = createRequestHeader({ onSave: requestSave });
+    const dialog = createEnvironmentDialog();
+
+    openEnvironments = dialog.open;
+
+    const header = createRequestHeader({
+        onSave: requestSave,
+        onManageEnvironments: dialog.open,
+    });
     const urlBar = createUrlBar({ onSend: send, onCancel: cancel });
     const split = createSplitView(createRequestEditor(), createResponseView());
 
-    replace(root, buildTopBar(mascotUri), header, urlBar, split);
+    replace(root, buildTopBar(mascotUri), header, urlBar, split, dialog.root);
     emit('response', 'active');
 }
 
@@ -97,6 +107,8 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
                 send();
             } else if (message.name === 'save') {
                 requestSave();
+            } else if (message.name === 'environments') {
+                openEnvironments();
             } else {
                 cancel();
             }

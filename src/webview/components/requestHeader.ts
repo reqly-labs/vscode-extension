@@ -4,7 +4,10 @@ import { icon } from '../icons';
 import { isDirty, on, state } from '../store';
 import { createEnvironmentPicker } from './environmentPicker';
 
-export function createRequestHeader(options: { onSave: () => void }): HTMLElement {
+export function createRequestHeader(options: {
+    onSave: () => void;
+    onManageEnvironments: () => void;
+}): HTMLElement {
     const mark = el('span', { class: 'request-dot', title: 'Unsaved changes' });
     const title = el('span', { class: 'request-title' });
     const trail = el('span', { class: 'request-trail' });
@@ -19,7 +22,7 @@ export function createRequestHeader(options: { onSave: () => void }): HTMLElemen
         icon('save'),
         saveLabel
     );
-    const environment = createEnvironmentPicker();
+    const environment = createEnvironmentPicker({ onManage: options.onManageEnvironments });
     const root = el(
         'div',
         { class: 'request-header' },

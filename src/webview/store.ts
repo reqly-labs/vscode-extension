@@ -48,7 +48,7 @@ export const state: AppState = {
     prettyPrint: true,
     wrapLines: true,
     active: { id: null, name: '', location: '' },
-    environment: { id: null, name: '', names: [], variables: [] },
+    environment: { activeId: null, environments: [] },
     baseline: '',
 };
 
