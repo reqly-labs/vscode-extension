@@ -23,7 +23,7 @@ suite('typing a variable into a field', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 {
@@ -36,7 +36,7 @@ suite('typing a variable into a field', () => {
             ],
             collection: null,
             dynamic: [],
-        };
+        });
 
         const handle = harness.createVariableInput({
             value: '',
@@ -179,7 +179,7 @@ suite('showing a variable in a field', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 {
@@ -192,7 +192,7 @@ suite('showing a variable in a field', () => {
             ],
             collection: null,
             dynamic: [],
-        };
+        });
     });
 
     teardown(() => {
@@ -239,12 +239,12 @@ suite('showing a variable in a field', () => {
     });
 
     test('marks every name when no environment is chosen', () => {
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: null,
             environments: [],
             collection: null,
             dynamic: [],
-        };
+        });
 
         const backdrop = backdropOf('{{baseUrl}}');
 
@@ -286,7 +286,7 @@ suite('variables reach the request panel', () => {
             name: 'Listar',
             location: '',
         });
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 {
@@ -299,7 +299,7 @@ suite('variables reach the request panel', () => {
             ],
             collection: null,
             dynamic: [],
-        };
+        });
 
         const bar = harness.createUrlBar({
             onSend: harness.actions.send,
@@ -327,7 +327,7 @@ suite('variables reach the request panel', () => {
 
     test('offers the environments it was told about', () => {
         harness.store.hydrate(webviewState({}, null), { id: null, name: '', location: '' });
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: [] },
@@ -335,7 +335,7 @@ suite('variables reach the request panel', () => {
             ],
             collection: null,
             dynamic: [],
-        };
+        });
 
         const header = harness.createRequestHeader({
             onSave: () => {},
@@ -343,7 +343,7 @@ suite('variables reach the request panel', () => {
         });
 
         harness.window.document.getElementById('root')?.appendChild(header);
-        harness.store.emit('environment');
+        harness.store.commit();
 
         const label = harness.window.document.querySelector('.env-pick-label');
 
@@ -358,12 +358,12 @@ suite('variables reach the request panel', () => {
 
     test('asks the host to switch environment when one is picked', () => {
         harness.store.hydrate(webviewState({}, null), { id: null, name: '', location: '' });
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: null,
             environments: [{ id: 'e2', name: 'Prod', createdAt: 0, updatedAt: 0, variables: [] }],
             collection: null,
             dynamic: [],
-        };
+        });
 
         const header = harness.createRequestHeader({
             onSave: () => {},
@@ -371,7 +371,7 @@ suite('variables reach the request panel', () => {
         });
 
         harness.window.document.getElementById('root')?.appendChild(header);
-        harness.store.emit('environment');
+        harness.store.commit();
 
         const items = [...harness.window.document.querySelectorAll('.env-menu .menu-item')];
         const prod = items.find((node) => node.textContent === 'Prod') as HTMLButtonElement;
@@ -390,14 +390,14 @@ suite('the styled box stays on the element the stylesheet targets', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: VARIABLES },
             ],
             collection: null,
             dynamic: [],
-        };
+        });
     });
 
     teardown(() => {
@@ -485,14 +485,14 @@ suite('the suggestion list floats above the panel', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: VARIABLES },
             ],
             collection: null,
             dynamic: [],
-        };
+        });
     });
 
     teardown(() => {
@@ -560,7 +560,17 @@ suite('the suggestion list floats above the panel', () => {
         assert.equal(secret.getAttribute('title'), 'apiKey');
     });
 
-    test('takes the list away when the field is thrown away', () => {
+    test('shares one overlay no matter how many fields are on screen', () => {
+        const first = fieldIn('field kv-key');
+        const second = fieldIn('field kv-value');
+
+        typeInto(first, '{{');
+        typeInto(second, '{{');
+
+        assert.equal(harness.window.document.querySelectorAll('.variable-popup').length, 1);
+    });
+
+    test('closes the shared overlay when the field that owns it is thrown away', () => {
         const handle = harness.createVariableInput({
             value: '',
             className: 'field',
@@ -569,10 +579,12 @@ suite('the suggestion list floats above the panel', () => {
         });
 
         harness.window.document.getElementById('root')?.appendChild(handle.root);
-        assert.equal(harness.window.document.querySelectorAll('.variable-popup').length, 1);
+        typeInto(handle.input, '{{');
+        assert.equal(harness.window.document.querySelectorAll('.variable-popup.is-open').length, 1);
 
         handle.destroy();
-        assert.equal(harness.window.document.querySelectorAll('.variable-popup').length, 0);
+        assert.equal(harness.window.document.querySelectorAll('.variable-popup.is-open').length, 0);
+        assert.equal(harness.window.document.querySelectorAll('.variable-popup').length, 1);
     });
 });
 
@@ -581,14 +593,14 @@ suite('variables reach the auth fields', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 { id: 'e1', name: 'Dev', createdAt: 0, updatedAt: 0, variables: VARIABLES },
             ],
             collection: null,
             dynamic: [],
-        };
+        });
     });
 
     teardown(() => {
@@ -625,7 +637,7 @@ suite('the three scopes reach the fields', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 {
@@ -648,7 +660,7 @@ suite('the three scopes reach the fields', () => {
                 { name: '$guid', description: 'A random UUID v4' },
                 { name: '$timestamp', description: 'The current time in Unix seconds' },
             ],
-        };
+        });
     });
 
     teardown(() => {

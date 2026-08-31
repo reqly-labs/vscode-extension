@@ -6,7 +6,7 @@ import {
 import { schedulePersist } from '../bridge';
 import { el } from '../dom';
 import { icon } from '../icons';
-import { on, state } from '../store';
+import { getState, mutate, watch } from '../store';
 
 function toggleRow(
     label: string,
@@ -48,14 +48,16 @@ export function createSettingsMenu(): {
     const timeout = el('input', {
         class: 'field',
         type: 'number',
-        value: String(state.settings.timeout),
+        value: String(getState().settings.timeout),
         attrs: { min: '100', step: '500' },
         on: {
             change: (event) => {
                 const parsed = Number((event.target as HTMLInputElement).value);
 
-                state.settings.timeout =
-                    Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
+                mutate((draft) => {
+                    draft.settings.timeout =
+                        Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
+                });
                 schedulePersist();
             },
         },
@@ -63,17 +65,18 @@ export function createSettingsMenu(): {
     const maxResponseSize = el('input', {
         class: 'field',
         type: 'number',
-        value: toMegabytes(state.settings.maxResponseSize),
+        value: toMegabytes(getState().settings.maxResponseSize),
         attrs: { min: '1', step: '10' },
         on: {
             change: (event) => {
                 const parsed = Number((event.target as HTMLInputElement).value) * MEGABYTE;
 
-                state.settings.maxResponseSize =
-                    Number.isFinite(parsed) && parsed >= MIN_MAX_RESPONSE_BYTES
-                        ? parsed
-                        : DEFAULT_MAX_RESPONSE_BYTES;
-                maxResponseSize.value = toMegabytes(state.settings.maxResponseSize);
+                mutate((draft) => {
+                    draft.settings.maxResponseSize =
+                        Number.isFinite(parsed) && parsed >= MIN_MAX_RESPONSE_BYTES
+                            ? parsed
+                            : DEFAULT_MAX_RESPONSE_BYTES;
+                });
                 schedulePersist();
             },
         },
@@ -82,18 +85,22 @@ export function createSettingsMenu(): {
     const redirects = toggleRow(
         'Follow redirects',
         'Chase 3xx responses automatically.',
-        state.settings.followRedirects,
+        getState().settings.followRedirects,
         (value) => {
-            state.settings.followRedirects = value;
+            mutate((draft) => {
+                draft.settings.followRedirects = value;
+            });
             schedulePersist();
         }
     );
     const tls = toggleRow(
         'Verify TLS certificates',
         'Turn off to allow self-signed certificates.',
-        state.settings.rejectUnauthorized,
+        getState().settings.rejectUnauthorized,
         (value) => {
-            state.settings.rejectUnauthorized = value;
+            mutate((draft) => {
+                draft.settings.rejectUnauthorized = value;
+            });
             schedulePersist();
         }
     );
@@ -144,12 +151,15 @@ export function createSettingsMenu(): {
     );
     const root = el('div', { class: 'menu settings-menu' }, trigger, panel);
 
-    on('settings', () => {
-        timeout.value = String(state.settings.timeout);
-        maxResponseSize.value = toMegabytes(state.settings.maxResponseSize);
-        redirects.input.checked = state.settings.followRedirects;
-        tls.input.checked = state.settings.rejectUnauthorized;
-    });
+    watch(
+        (state) => state.settings,
+        (settings) => {
+            timeout.value = String(settings.timeout);
+            maxResponseSize.value = toMegabytes(settings.maxResponseSize);
+            redirects.input.checked = settings.followRedirects;
+            tls.input.checked = settings.rejectUnauthorized;
+        }
+    );
     document.addEventListener('mousedown', (event) => {
         if (!(event.target as HTMLElement | null)?.closest('.settings-menu')) {
             root.classList.remove('is-open');

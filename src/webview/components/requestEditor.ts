@@ -1,9 +1,9 @@
 import { BODY_TYPES } from '../../core/constants';
-import type { BodyType } from '../../core/types';
+import type { BodyType, RequestSnapshot } from '../../core/types';
 import { post, schedulePersist } from '../bridge';
 import { el, replace } from '../dom';
 import { icon } from '../icons';
-import { on, state } from '../store';
+import { getState, mutate, watch, type ReadonlyAppState } from '../store';
 import { createAuthEditor } from './authEditor';
 import { createEditor } from './codeEditor';
 import { createFormDataEditor } from './formDataEditor';
@@ -21,203 +21,202 @@ const BODY_LABELS: Record<BodyType, string> = {
     binary: 'Binary File',
 };
 
-function activeCount(
-    items: {
-        key: string;
-        enabled: boolean;
-    }[]
-): number {
+interface BodyView {
+    sync(): void;
+    destroy(): void;
+}
+
+function activeCount(items: readonly { key: string; enabled: boolean }[]): number {
     return items.filter((item) => item.enabled && item.key.trim()).length;
 }
 
+function editSnapshot(change: (snapshot: RequestSnapshot) => void): void {
+    mutate((draft) => change(draft.snapshot));
+    schedulePersist();
+}
+
 export function createRequestEditor(): HTMLElement {
-    const edited = () => {
-        schedulePersist();
-        refreshBadges();
-    };
-    const structural = () => {
-        schedulePersist();
-        refreshBadges();
-    };
     const params = createKvEditor({
-        items: () => state.snapshot.params,
+        items: () => getState().snapshot.params,
         keyPlaceholder: 'Parameter',
         emptyLabel: 'No query parameters yet.',
-        onEdit: edited,
-        onStructureChange: structural,
+        edit: (change) => editSnapshot((snapshot) => change(snapshot.params)),
     });
     const headers = createKvEditor({
-        items: () => state.snapshot.headers,
+        items: () => getState().snapshot.headers,
         keyPlaceholder: 'Header',
         emptyLabel: 'No headers yet.',
-        onEdit: edited,
-        onStructureChange: structural,
+        edit: (change) => editSnapshot((snapshot) => change(snapshot.headers)),
     });
     const auth = createAuthEditor({
-        getAuth: () => state.snapshot.auth,
-        setAuth: (next) => {
-            state.snapshot.auth = next;
-        },
-        onEdit: () => {
-            edited();
-            tabs.setDot('auth', state.snapshot.auth.type !== 'none');
-        },
+        getAuth: () => getState().snapshot.auth,
+        setAuth: (next) =>
+            editSnapshot((snapshot) => {
+                snapshot.auth = next;
+            }),
     });
     const bodyPane = el('div', { class: 'body-pane' });
     const bodySelect = createSelect<BodyType>({
-        value: state.snapshot.bodyType,
+        value: getState().snapshot.bodyType,
         ariaLabel: 'Body type',
         className: 'select-wide',
         items: BODY_TYPES.map((type) => ({ value: type, label: BODY_LABELS[type] })),
-        onChange: (type) => {
-            state.snapshot.bodyType = type;
-            renderBody();
-            edited();
-            tabs.setDot('body', type !== 'none');
-        },
+        onChange: (bodyType) =>
+            editSnapshot((snapshot) => {
+                snapshot.bodyType = bodyType;
+            }),
     });
+    const beautify = el(
+        'button',
+        {
+            class: 'ghost-btn',
+            type: 'button',
+            on: {
+                click: () => {
+                    const snapshot = getState().snapshot;
+
+                    if (snapshot.bodyType !== 'json') {
+                        return;
+                    }
+
+                    try {
+                        const pretty = JSON.stringify(JSON.parse(snapshot.body), null, 2);
+
+                        editSnapshot((draft) => {
+                            draft.body = pretty;
+                        });
+                    } catch {
+                        post({
+                            type: 'notify',
+                            level: 'warn',
+                            text: 'The request body is not valid JSON.',
+                        });
+                    }
+                },
+            },
+        },
+        icon('zap'),
+        'Beautify'
+    );
     const bodyTab = el(
         'div',
         { class: 'pane body-tab' },
-        el('div', { class: 'body-toolbar' }, bodySelect.root, buildBodyActions()),
+        el(
+            'div',
+            { class: 'body-toolbar' },
+            bodySelect.root,
+            el('div', { class: 'body-actions' }, beautify)
+        ),
         bodyPane
     );
 
-    function buildBodyActions(): HTMLElement {
-        const beautify = el(
+    let bodyView: BodyView | null = null;
+    let renderedBodyType: BodyType | null = null;
+
+    function buildTextBody(type: 'json' | 'xml' | 'text'): BodyView {
+        const editor = createEditor({
+            value: getState().snapshot.body,
+            language: type === 'text' ? 'text' : type,
+            placeholder: type === 'json' ? '{\n  "key": "value"\n}' : '',
+            onChange: (value) =>
+                editSnapshot((snapshot) => {
+                    snapshot.body = value;
+                }),
+        });
+
+        replace(bodyPane, editor.root);
+
+        return {
+            sync: () => editor.setValue(getState().snapshot.body),
+            destroy: () => editor.destroy(),
+        };
+    }
+
+    function buildFormBody(): BodyView {
+        const editor = createKvEditor({
+            items: () => getState().snapshot.formBody,
+            emptyLabel: 'No form values yet.',
+            edit: (change) => editSnapshot((snapshot) => change(snapshot.formBody)),
+        });
+
+        replace(bodyPane, editor.root);
+
+        return { sync: editor.refresh, destroy: editor.destroy };
+    }
+
+    function buildMultipartBody(): BodyView {
+        const editor = createFormDataEditor({
+            items: () => getState().snapshot.multipartBody,
+            edit: (change) => editSnapshot((snapshot) => change(snapshot.multipartBody)),
+        });
+
+        replace(bodyPane, editor.root);
+
+        return { sync: editor.refresh, destroy: editor.destroy };
+    }
+
+    function buildBinaryBody(): BodyView {
+        const label = el('span', { class: 'file-pick-name' });
+        const picker = el(
             'button',
             {
-                class: 'ghost-btn',
+                class: 'file-pick',
                 type: 'button',
-                on: {
-                    click: () => {
-                        if (state.snapshot.bodyType !== 'json') {
-                            return;
-                        }
-
-                        try {
-                            state.snapshot.body = JSON.stringify(
-                                JSON.parse(state.snapshot.body),
-                                null,
-                                2
-                            );
-                            renderBody();
-                            edited();
-                        } catch {
-                            post({
-                                type: 'notify',
-                                level: 'warn',
-                                text: 'The request body is not valid JSON.',
-                            });
-                        }
-                    },
-                },
+                on: { click: () => post({ type: 'pickFile', target: 'binary', fieldId: '' }) },
             },
-            icon('zap'),
-            'Beautify'
+            icon('file'),
+            label
         );
-        const actions = el('div', { class: 'body-actions' }, beautify);
-        const sync = () => {
-            beautify.classList.toggle('is-hidden', state.snapshot.bodyType !== 'json');
+        const caption = el('p', { class: 'empty-hint' });
+
+        replace(bodyPane, el('div', { class: 'binary-picker' }, picker, caption));
+
+        return {
+            sync() {
+                const path = getState().snapshot.binaryPath;
+
+                picker.classList.toggle('has-file', Boolean(path));
+                picker.title = path || 'Choose a file';
+                label.textContent = path ? (path.split(/[\\/]/).pop() ?? path) : 'Choose a file…';
+                caption.textContent = path || 'The file is streamed as the raw request body.';
+            },
+            destroy: () => {},
         };
-
-        sync();
-        on('body', sync);
-
-        return actions;
     }
 
-    let activeFormDataEditor: {
-        destroy(): void;
-    } | null = null;
+    function buildBodyView(type: BodyType): BodyView {
+        switch (type) {
+            case 'json':
+            case 'xml':
+            case 'text':
+                return buildTextBody(type);
+            case 'form':
+                return buildFormBody();
+            case 'multipart':
+                return buildMultipartBody();
+            case 'binary':
+                return buildBinaryBody();
+            default:
+                replace(
+                    bodyPane,
+                    el('p', { class: 'empty-hint', text: 'This request does not send a body.' })
+                );
 
-    function renderBody(): void {
-        activeFormDataEditor?.destroy();
-        activeFormDataEditor = null;
-        const type = state.snapshot.bodyType;
-
-        if (type === 'none') {
-            replace(
-                bodyPane,
-                el('p', { class: 'empty-hint', text: 'This request does not send a body.' })
-            );
-
-            return;
+                return { sync: () => {}, destroy: () => {} };
         }
-
-        if (type === 'json' || type === 'xml' || type === 'text') {
-            const editor = createEditor({
-                value: state.snapshot.body,
-                language: type === 'text' ? 'text' : type,
-                placeholder: type === 'json' ? '{\n  "key": "value"\n}' : '',
-                onChange: (value) => {
-                    state.snapshot.body = value;
-                    edited();
-                },
-            });
-
-            replace(bodyPane, editor.root);
-
-            return;
-        }
-
-        if (type === 'form') {
-            const editor = createKvEditor({
-                items: () => state.snapshot.formBody,
-                emptyLabel: 'No form values yet.',
-                onEdit: edited,
-                onStructureChange: structural,
-            });
-
-            replace(bodyPane, editor.root);
-
-            return;
-        }
-
-        if (type === 'multipart') {
-            const editor = createFormDataEditor({
-                items: () => state.snapshot.multipartBody,
-                onEdit: edited,
-                onStructureChange: structural,
-            });
-
-            activeFormDataEditor = editor;
-            replace(bodyPane, editor.root);
-
-            return;
-        }
-
-        replace(bodyPane, buildBinaryPicker());
     }
 
-    function buildBinaryPicker(): HTMLElement {
-        const name = state.snapshot.binaryPath
-            ? state.snapshot.binaryPath.split(/[\\/]/).pop()
-            : 'Choose a file…';
+    function renderBody(type: BodyType): void {
+        if (renderedBodyType === type) {
+            bodyView?.sync();
 
-        return el(
-            'div',
-            { class: 'binary-picker' },
-            el(
-                'button',
-                {
-                    class: `file-pick${state.snapshot.binaryPath ? ' has-file' : ''}`,
-                    type: 'button',
-                    title: state.snapshot.binaryPath || 'Choose a file',
-                    on: {
-                        click: () => post({ type: 'pickFile', target: 'binary', fieldId: '' }),
-                    },
-                },
-                icon('file'),
-                el('span', { class: 'file-pick-name', text: name ?? '' })
-            ),
-            state.snapshot.binaryPath
-                ? el('p', { class: 'empty-hint', text: state.snapshot.binaryPath })
-                : el('p', {
-                      class: 'empty-hint',
-                      text: 'The file is streamed as the raw request body.',
-                  })
-        );
+            return;
+        }
+
+        bodyView?.destroy();
+        renderedBodyType = type;
+        bodyView = buildBodyView(type);
+        bodyView.sync();
     }
 
     const panes: Record<string, HTMLElement> = {
@@ -234,52 +233,66 @@ export function createRequestEditor(): HTMLElement {
             { id: 'body', label: 'Body' },
             { id: 'auth', label: 'Auth' },
         ],
-        active: state.activeRequestTab,
+        active: getState().activeRequestTab,
         onChange: (id) => {
-            state.activeRequestTab = id;
-            showPane(id);
+            mutate((draft) => {
+                draft.activeRequestTab = id;
+            });
             schedulePersist();
         },
     });
 
-    function showPane(id: string): void {
-        replace(content, panes[id] ?? panes.params);
+    function selectBadges(state: ReadonlyAppState) {
+        return {
+            params: activeCount(state.snapshot.params),
+            headers: activeCount(state.snapshot.headers),
+            body: state.snapshot.bodyType !== 'none',
+            auth: state.snapshot.auth.type !== 'none',
+        };
     }
 
-    function refreshBadges(): void {
-        const paramCount = activeCount(state.snapshot.params);
-        const headerCount = activeCount(state.snapshot.headers);
-
-        tabs.setBadge('params', paramCount > 0 ? String(paramCount) : null);
-        tabs.setBadge('headers', headerCount > 0 ? String(headerCount) : null);
-        tabs.setDot('body', state.snapshot.bodyType !== 'none');
-        tabs.setDot('auth', state.snapshot.auth.type !== 'none');
-    }
-
-    on('params', () => {
-        params.refresh();
-        refreshBadges();
+    watch(
+        (state) => state.snapshot.params,
+        () => params.refresh()
+    );
+    watch(
+        (state) => state.snapshot.headers,
+        () => headers.refresh()
+    );
+    watch(
+        (state) => state.snapshot.auth,
+        () => auth.refresh()
+    );
+    watch(
+        (state) => state.snapshot.bodyType,
+        (bodyType) => {
+            bodySelect.setValue(bodyType);
+            beautify.classList.toggle('is-hidden', bodyType !== 'json');
+            renderBody(bodyType);
+        }
+    );
+    watch(
+        (state) => ({
+            body: state.snapshot.body,
+            binaryPath: state.snapshot.binaryPath,
+            formBody: state.snapshot.formBody,
+            multipartBody: state.snapshot.multipartBody,
+        }),
+        () => bodyView?.sync()
+    );
+    watch(selectBadges, (counts) => {
+        tabs.setBadge('params', counts.params > 0 ? String(counts.params) : null);
+        tabs.setBadge('headers', counts.headers > 0 ? String(counts.headers) : null);
+        tabs.setDot('body', counts.body);
+        tabs.setDot('auth', counts.auth);
     });
-    on('headers', () => {
-        headers.refresh();
-        refreshBadges();
-    });
-    on('auth', () => {
-        auth.refresh();
-        refreshBadges();
-    });
-    on('body', () => {
-        bodySelect.setValue(state.snapshot.bodyType);
-        renderBody();
-        refreshBadges();
-    });
-    on('requestTab', () => {
-        tabs.setActive(state.activeRequestTab);
-        showPane(state.activeRequestTab);
-    });
-    renderBody();
-    refreshBadges();
-    showPane(state.activeRequestTab);
+    watch(
+        (state) => state.activeRequestTab,
+        (id) => {
+            tabs.setActive(id);
+            replace(content, panes[id] ?? panes.params);
+        }
+    );
 
     return el(
         'section',

@@ -14,7 +14,7 @@ suite('variables in the request body', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 {
@@ -31,7 +31,7 @@ suite('variables in the request body', () => {
             ],
             collection: null,
             dynamic: [],
-        };
+        });
 
         const editor = harness.createEditor({
             value: '',

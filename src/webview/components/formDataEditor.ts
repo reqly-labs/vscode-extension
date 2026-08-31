@@ -1,36 +1,40 @@
 import { emptyFormField, type FormField } from '../../core/types';
 import { post } from '../bridge';
-import { el, replace } from '../dom';
+import { el, reconcile, replace } from '../dom';
 import { icon, iconButton } from '../icons';
-import { createSelect, type SelectHandle } from './select';
+import { createSelect } from './select';
+
+interface Row {
+    root: HTMLElement;
+    update(item: FormField): void;
+    destroy(): void;
+}
+
+export interface FormDataEditorHandle {
+    root: HTMLElement;
+    refresh(): void;
+    destroy(): void;
+}
+
+export interface FormDataEditorOptions {
+    items: () => readonly FormField[];
+    edit: (change: (items: FormField[]) => void) => void;
+}
 
 function fileName(path: string): string {
     return path.split(/[\/]/).pop() ?? path;
 }
 
-export function createFormDataEditor(options: {
-    items: () => FormField[];
-    onStructureChange: () => void;
-    onEdit: () => void;
-}): {
-    root: HTMLElement;
-    refresh(): void;
-    destroy(): void;
-} {
+export function createFormDataEditor(options: FormDataEditorOptions): FormDataEditorHandle {
     const rows = el('div', { class: 'kv-rows' });
-    let activeSelects: SelectHandle<'text' | 'file'>[] = [];
+    const built = new Map<string, Row>();
+    const emptyHint = el('p', { class: 'empty-hint', text: 'No form fields yet.' });
     const addButton = el(
         'button',
         {
             class: 'ghost-btn',
             type: 'button',
-            on: {
-                click: () => {
-                    options.items().push(emptyFormField());
-                    render();
-                    options.onStructureChange();
-                },
-            },
+            on: { click: () => options.edit((items) => items.push(emptyFormField())) },
         },
         icon('plus'),
         'Add field'
@@ -42,43 +46,39 @@ export function createFormDataEditor(options: {
         el('div', { class: 'kv-actions' }, addButton)
     );
 
-    function buildValueCell(item: FormField): HTMLElement {
-        if (item.type === 'file') {
-            return el(
-                'button',
-                {
-                    class: `file-pick${item.filePath ? ' has-file' : ''}`,
-                    type: 'button',
-                    title: item.filePath || 'Choose a file',
-                    on: {
-                        click: () =>
-                            post({ type: 'pickFile', target: 'multipart', fieldId: item.id }),
-                    },
-                },
-                icon('file'),
-                el('span', {
-                    class: 'file-pick-name',
-                    text: item.filePath ? fileName(item.filePath) : 'Choose file…',
-                })
-            );
-        }
+    function write(id: string, patch: Partial<FormField>): void {
+        options.edit((items) => {
+            const entry = items.find((item) => item.id === id);
 
-        return el('input', {
+            if (entry) {
+                Object.assign(entry, patch);
+            }
+        });
+    }
+
+    function buildRow(item: FormField): Row {
+        const id = item.id;
+        const valueCell = el('div', { class: 'kv-value-cell' });
+        const textField = el('input', {
             class: 'field kv-value',
             value: item.value,
             spellcheck: false,
             placeholder: 'Value',
             on: {
-                input: (event) => {
-                    item.value = (event.target as HTMLInputElement).value;
-                    options.onEdit();
-                },
+                input: (event) => write(id, { value: (event.target as HTMLInputElement).value }),
             },
         });
-    }
-
-    function buildRow(item: FormField): HTMLElement {
-        const valueCell = el('div', { class: 'kv-value-cell' }, buildValueCell(item));
+        const filePick = el(
+            'button',
+            {
+                class: 'file-pick',
+                type: 'button',
+                on: { click: () => post({ type: 'pickFile', target: 'multipart', fieldId: id }) },
+            },
+            icon('file'),
+            el('span', { class: 'file-pick-name' })
+        );
+        const fileLabel = filePick.querySelector('.file-pick-name') as HTMLElement;
         const typeSelect = createSelect<'text' | 'file'>({
             value: item.type,
             ariaLabel: 'Field type',
@@ -87,75 +87,105 @@ export function createFormDataEditor(options: {
                 { value: 'text', label: 'Text' },
                 { value: 'file', label: 'File' },
             ],
-            onChange: (type) => {
-                item.type = type;
-                replace(valueCell, buildValueCell(item));
-                options.onEdit();
+            onChange: (type) => write(id, { type }),
+        });
+        const toggle = el('input', {
+            class: 'kv-check',
+            type: 'checkbox',
+            checked: item.enabled,
+            attrs: { 'aria-label': 'Enable field' },
+            on: {
+                change: (event) =>
+                    write(id, { enabled: (event.target as HTMLInputElement).checked }),
             },
         });
-
-        activeSelects.push(typeSelect);
-
-        return el(
+        const keyField = el('input', {
+            class: 'field kv-key',
+            value: item.key,
+            spellcheck: false,
+            placeholder: 'Field name',
+            on: { input: (event) => write(id, { key: (event.target as HTMLInputElement).value }) },
+        });
+        const rowRoot = el(
             'div',
-            { class: `kv-row is-form${item.enabled ? '' : ' is-disabled'}` },
-            el('input', {
-                class: 'kv-check',
-                type: 'checkbox',
-                checked: item.enabled,
-                attrs: { 'aria-label': 'Enable field' },
-                on: {
-                    change: (event) => {
-                        item.enabled = (event.target as HTMLInputElement).checked;
-                        render();
-                        options.onEdit();
-                    },
-                },
-            }),
-            el('input', {
-                class: 'field kv-key',
-                value: item.key,
-                spellcheck: false,
-                placeholder: 'Field name',
-                on: {
-                    input: (event) => {
-                        item.key = (event.target as HTMLInputElement).value;
-                        options.onEdit();
-                    },
-                },
-            }),
+            { class: 'kv-row is-form' },
+            toggle,
+            keyField,
             typeSelect.root,
             valueCell,
             iconButton(
                 'trash',
                 'Remove field',
-                () => {
-                    const items = options.items();
-                    const index = items.indexOf(item);
+                () =>
+                    options.edit((items) => {
+                        const index = items.findIndex((item) => item.id === id);
 
-                    if (index >= 0) {
-                        items.splice(index, 1);
-                        render();
-                        options.onStructureChange();
-                    }
-                },
+                        if (index >= 0) {
+                            items.splice(index, 1);
+                        }
+                    }),
                 'is-danger'
             )
         );
+
+        return {
+            root: rowRoot,
+            update(next) {
+                rowRoot.classList.toggle('is-disabled', !next.enabled);
+                toggle.checked = next.enabled;
+                if (keyField.value !== next.key) {
+                    keyField.value = next.key;
+                }
+
+                typeSelect.setValue(next.type);
+                if (next.type === 'file') {
+                    filePick.classList.toggle('has-file', Boolean(next.filePath));
+                    filePick.title = next.filePath || 'Choose a file';
+                    fileLabel.textContent = next.filePath
+                        ? fileName(next.filePath)
+                        : 'Choose file…';
+                    if (valueCell.firstChild !== filePick) {
+                        replace(valueCell, filePick);
+                    }
+
+                    return;
+                }
+
+                if (textField.value !== next.value) {
+                    textField.value = next.value;
+                }
+
+                if (valueCell.firstChild !== textField) {
+                    replace(valueCell, textField);
+                }
+            },
+            destroy() {
+                typeSelect.destroy();
+            },
+        };
     }
 
     function render(): void {
-        activeSelects.forEach((select) => select.destroy());
-        activeSelects = [];
         const items = options.items();
+        const ids = items.map((item) => item.id);
 
-        if (items.length === 0) {
-            replace(rows, el('p', { class: 'empty-hint', text: 'No form fields yet.' }));
-
-            return;
+        for (const [id, row] of [...built]) {
+            if (!ids.includes(id)) {
+                row.destroy();
+                built.delete(id);
+            }
         }
 
-        replace(rows, ...items.map(buildRow));
+        const nodes = items.map((item) => {
+            const row = built.get(item.id) ?? buildRow(item);
+
+            built.set(item.id, row);
+            row.update(item);
+
+            return row.root;
+        });
+
+        reconcile(rows, nodes.length > 0 ? nodes : [emptyHint]);
     }
 
     render();
@@ -164,8 +194,11 @@ export function createFormDataEditor(options: {
         root,
         refresh: render,
         destroy() {
-            activeSelects.forEach((select) => select.destroy());
-            activeSelects = [];
+            for (const row of built.values()) {
+                row.destroy();
+            }
+
+            built.clear();
         },
     };
 }

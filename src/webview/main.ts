@@ -8,7 +8,7 @@ import { createResponseView } from './components/responseView';
 import { createSplitView } from './components/splitView';
 import { createUrlBar } from './components/urlBar';
 import { el, replace } from './dom';
-import { emit, hydrate, markSaved, setActive, setEnvironment, state } from './store';
+import { getState, hydrate, markSaved, mutate, setActive, setEnvironment } from './store';
 import './styles.css';
 
 const root = document.getElementById('root') as HTMLElement;
@@ -50,7 +50,6 @@ function mount(mascotUri: string): void {
     const split = createSplitView(createRequestEditor(), createResponseView());
 
     replace(root, buildTopBar(mascotUri), header, urlBar, split, dialog.root);
-    emit('response', 'active');
 }
 
 window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
@@ -58,7 +57,7 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
 
     switch (message.type) {
         case 'init':
-            state.environment = message.environment;
+            setEnvironment(message.environment);
             hydrate(message.state, message.active);
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
             mount(message.mascotUri);
@@ -67,9 +66,11 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
             break;
         case 'loadRequest':
-            state.response = null;
-            state.error = null;
-            state.loading = false;
+            mutate((draft) => {
+                draft.response = null;
+                draft.error = null;
+                draft.loading = false;
+            });
             hydrate(message.state, message.active);
             break;
         case 'activeChanged':
@@ -83,24 +84,26 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             setActive(message.active);
             break;
         case 'response':
-            if (message.requestId !== state.requestId) {
+            if (message.requestId !== getState().requestId) {
                 return;
             }
 
-            state.loading = false;
-            state.error = null;
-            state.response = message.response;
-            emit('response');
+            mutate((draft) => {
+                draft.loading = false;
+                draft.error = null;
+                draft.response = message.response;
+            });
             break;
         case 'error':
-            if (message.requestId !== state.requestId) {
+            if (message.requestId !== getState().requestId) {
                 return;
             }
 
-            state.loading = false;
-            state.response = null;
-            state.error = message.error;
-            emit('response');
+            mutate((draft) => {
+                draft.loading = false;
+                draft.response = null;
+                draft.error = message.error;
+            });
             break;
         case 'command':
             if (message.name === 'send') {
@@ -115,19 +118,21 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
 
             break;
         case 'filePicked':
-            if (message.target === 'binary') {
-                state.snapshot.binaryPath = message.path;
-            } else {
-                const field = state.snapshot.multipartBody.find(
+            mutate((draft) => {
+                if (message.target === 'binary') {
+                    draft.snapshot.binaryPath = message.path;
+
+                    return;
+                }
+
+                const field = draft.snapshot.multipartBody.find(
                     (entry) => entry.id === message.fieldId
                 );
 
                 if (field) {
                     field.filePath = message.path;
                 }
-            }
-
-            emit('body');
+            });
             flushPersist();
             break;
     }

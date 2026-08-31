@@ -14,7 +14,12 @@ import { interpolateSnapshot, unresolvedInSnapshot } from '../core/variables';
 import { ancestorsOf, getRequest, requestLabel, rootCollectionOf } from '../core/workspace';
 import { BuildError, buildRequest } from '../http/buildRequest';
 import { decodeResponse } from '../http/decodeResponse';
-import { executeRequest, TransportError } from '../http/executeRequest';
+import {
+    executeRequest,
+    TransportError,
+    type RawResponse,
+} from '../http/executeRequest';
+import { removeSpill } from '../http/responseSink';
 import type { EnvironmentService } from '../services/EnvironmentService';
 import type { RequestStateService } from '../services/RequestStateService';
 import type { WorkspaceService } from '../services/WorkspaceService';
@@ -33,6 +38,7 @@ export class RequestPanel {
     private readonly disposables: vscode.Disposable[] = [];
     private inFlight: AbortController | undefined;
     private lastBody: Buffer | undefined;
+    private lastBodyPath: string | null = null;
     private ready = false;
     private pending: 'send' | 'save' | 'environments' | undefined;
     private activeRequestId: string | null = null;
@@ -445,10 +451,12 @@ export class RequestPanel {
             const raw = await executeRequest(wire, message.settings, controller.signal);
 
             if (controller.signal.aborted) {
+                await removeSpill(raw.spillPath);
+
                 return;
             }
 
-            this.lastBody = raw.body;
+            await this.keepBody(raw);
             this.send({
                 type: 'response',
                 requestId: message.requestId,
@@ -483,8 +491,14 @@ export class RequestPanel {
         }
     }
 
+    private async keepBody(raw: RawResponse): Promise<void> {
+        await removeSpill(this.lastBodyPath);
+        this.lastBody = raw.body;
+        this.lastBodyPath = raw.spillPath;
+    }
+
     private async saveResponse(fileName: string): Promise<void> {
-        if (!this.lastBody) {
+        if (!this.lastBody && !this.lastBodyPath) {
             void vscode.window.showWarningMessage('There is no response to save yet.');
 
             return;
@@ -500,13 +514,22 @@ export class RequestPanel {
             return;
         }
 
-        await vscode.workspace.fs.writeFile(target, this.lastBody);
+        if (this.lastBodyPath) {
+            await vscode.workspace.fs.copy(vscode.Uri.file(this.lastBodyPath), target, {
+                overwrite: true,
+            });
+        } else {
+            await vscode.workspace.fs.writeFile(target, this.lastBody as Buffer);
+        }
+
         vscode.window.setStatusBarMessage(`Response saved to ${target.fsPath}`, 3000);
     }
 
     private dispose(): void {
         RequestPanel.current = undefined;
         this.deps.onActiveChanged?.();
+        void removeSpill(this.lastBodyPath);
+        this.lastBodyPath = null;
         this.inFlight?.abort();
         this.disposables.forEach((disposable) => disposable.dispose());
         this.panel.dispose();

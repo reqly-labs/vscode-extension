@@ -1,7 +1,7 @@
-import { parseCurlCommand } from '../core/curl';
+import { parseCurlCommand, type ParsedCurl } from '../core/curl';
 import { formatJson, formatXml } from '../core/format';
 import { createId, emptyFormField, emptyKeyValue, type BodyType } from '../core/types';
-import { state } from './store';
+import { mutate, type AppState } from './store';
 
 function inferBodyType(contentType: string, body: string): BodyType {
     const type = contentType.toLowerCase();
@@ -42,7 +42,13 @@ export function applyCurl(text: string): boolean {
         return false;
     }
 
-    const { snapshot } = state;
+    mutate((draft) => fillFromCurl(draft, parsed));
+
+    return true;
+}
+
+function fillFromCurl(draft: AppState, parsed: ParsedCurl): void {
+    const { snapshot } = draft;
 
     snapshot.method = parsed.method;
     snapshot.url = parsed.url;
@@ -122,13 +128,11 @@ export function applyCurl(text: string): boolean {
         }
     }
 
-    activateRelevantTab();
-
-    return true;
+    activateRelevantTab(draft);
 }
 
-function activateRelevantTab(): void {
-    const { snapshot } = state;
+function activateRelevantTab(draft: AppState): void {
+    const { snapshot } = draft;
     const hasParams = snapshot.params.some((param) => param.enabled && param.key.trim());
     const hasHeaders = snapshot.headers.some((header) => header.enabled && header.key.trim());
     const hasBody =
@@ -138,12 +142,12 @@ function activateRelevantTab(): void {
     const hasAuth = snapshot.auth.type !== 'none';
 
     if (hasParams) {
-        state.activeRequestTab = 'params';
+        draft.activeRequestTab = 'params';
     } else if (hasHeaders) {
-        state.activeRequestTab = 'headers';
+        draft.activeRequestTab = 'headers';
     } else if (hasBody) {
-        state.activeRequestTab = 'body';
+        draft.activeRequestTab = 'body';
     } else if (hasAuth) {
-        state.activeRequestTab = 'auth';
+        draft.activeRequestTab = 'auth';
     }
 }

@@ -1,7 +1,8 @@
+import type { ActiveRequestInfo } from '../../core/messages';
 import { post } from '../bridge';
 import { el, replace } from '../dom';
 import { icon } from '../icons';
-import { isDirty, on, state } from '../store';
+import { persistable, selectDirty, watch } from '../store';
 import { createEnvironmentPicker } from './environmentPicker';
 
 export function createRequestHeader(options: {
@@ -29,9 +30,7 @@ export function createRequestHeader(options: {
         el('div', { class: 'request-identity' }, mark, title, trail),
         el('div', { class: 'request-tools' }, environment.root, saveButton)
     );
-    const paint = () => {
-        const { active } = state;
-        const dirty = isDirty();
+    const paint = ({ active, dirty }: { active: ActiveRequestInfo; dirty: boolean }) => {
         const linked = Boolean(active.id);
 
         title.textContent = linked ? active.name : 'Untitled request';
@@ -51,12 +50,11 @@ export function createRequestHeader(options: {
             : 'Save this request into a collection';
     };
 
-    on('active', paint);
-    paint();
+    watch((state) => ({ active: state.active, dirty: selectDirty(state) }), paint);
 
     return root;
 }
 
 export function requestSave(): void {
-    post({ type: 'save', snapshot: state.snapshot });
+    post({ type: 'save', snapshot: persistable().snapshot });
 }

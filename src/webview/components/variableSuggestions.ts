@@ -1,6 +1,6 @@
 import { matchVariables, type Variable } from '../../core/variables';
 import { el, replace } from '../dom';
-import { state } from '../store';
+import { getState } from '../store';
 
 export interface SuggestionAnchor {
     left: number;
@@ -24,7 +24,20 @@ const MAX_WIDTH = 420;
 
 const MAX_HEIGHT = 220;
 
-let closeOpenList: (() => void) | null = null;
+interface Overlay {
+    root: HTMLElement;
+    list: HTMLElement;
+}
+
+let overlay: Overlay | null = null;
+
+let owner: object | null = null;
+
+let accept: ((key: string) => void) | null = null;
+
+let matches: Variable[] = [];
+
+let activeIndex = 0;
 
 export function knownVariableNames(): Set<string> {
     const names = new Set(
@@ -33,7 +46,7 @@ export function knownVariableNames(): Set<string> {
             .map((variable) => variable.key.trim())
     );
 
-    for (const entry of state.environment.dynamic) {
+    for (const entry of getState().environment.dynamic) {
         names.add(entry.name);
     }
 
@@ -41,7 +54,7 @@ export function knownVariableNames(): Set<string> {
 }
 
 function scopedVariables(): Variable[] {
-    const { activeId, environments, collection } = state.environment;
+    const { activeId, environments, collection } = getState().environment;
     const fromEnvironment = environments.find((entry) => entry.id === activeId)?.variables ?? [];
     const chosen = new Map<string, Variable>();
 
@@ -49,7 +62,7 @@ function scopedVariables(): Variable[] {
         const key = variable.key.trim();
 
         if (variable.enabled && key) {
-            chosen.set(key, variable);
+            chosen.set(key, { ...variable });
         }
     }
 
@@ -57,7 +70,7 @@ function scopedVariables(): Variable[] {
 }
 
 function dynamicAsVariables(): Variable[] {
-    return state.environment.dynamic.map((entry) => ({
+    return getState().environment.dynamic.map((entry) => ({
         id: entry.name,
         key: entry.name,
         value: entry.description,
@@ -66,123 +79,154 @@ function dynamicAsVariables(): Variable[] {
     }));
 }
 
+function mount(): Overlay {
+    if (overlay && overlay.root.ownerDocument === document) {
+        return overlay;
+    }
+
+    const list = el('div', { class: 'variable-list', role: 'listbox' });
+
+    overlay = { root: el('div', { class: 'variable-popup' }, list), list };
+    document.body.appendChild(overlay.root);
+
+    return overlay;
+}
+
+function render(): void {
+    const { list } = mount();
+
+    replace(
+        list,
+        ...matches.map((variable, index) =>
+            el(
+                'button',
+                {
+                    class: `variable-option${index === activeIndex ? ' is-active' : ''}`,
+                    type: 'button',
+                    role: 'option',
+                    title: variable.secret ? variable.key : `${variable.key} · ${variable.value}`,
+                    attrs: { 'aria-selected': index === activeIndex ? 'true' : 'false' },
+                    on: {
+                        mousedown: (event) => event.preventDefault(),
+                        mouseenter: () => {
+                            activeIndex = index;
+                            render();
+                        },
+                        click: () => choose(index),
+                    },
+                },
+                el('span', { class: 'variable-option-key', text: variable.key }),
+                el('span', {
+                    class: 'variable-option-value',
+                    text: variable.secret ? '••••••' : variable.value || '(empty)',
+                })
+            )
+        )
+    );
+
+    const active = list.querySelector('.variable-option.is-active');
+
+    if (active && typeof active.scrollIntoView === 'function') {
+        active.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function place(anchor: SuggestionAnchor): void {
+    const { root } = mount();
+    const width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, anchor.width));
+    const viewportWidth = window.innerWidth || width;
+    const viewportHeight = window.innerHeight || anchor.bottom + MAX_HEIGHT;
+    const left = Math.max(8, Math.min(anchor.left, viewportWidth - width - 8));
+    const below = viewportHeight - anchor.bottom;
+    const flip = below < MAX_HEIGHT + 16 && anchor.top > below;
+
+    root.style.width = `${width}px`;
+    root.style.left = `${left}px`;
+    if (flip) {
+        root.style.top = 'auto';
+        root.style.bottom = `${viewportHeight - anchor.top + 4}px`;
+    } else {
+        root.style.bottom = 'auto';
+        root.style.top = `${anchor.bottom + 4}px`;
+    }
+}
+
+function dismiss(): void {
+    matches = [];
+    activeIndex = 0;
+    owner = null;
+    accept = null;
+    if (overlay) {
+        overlay.root.classList.remove('is-open');
+        replace(overlay.list);
+    }
+}
+
+function choose(index: number): void {
+    const key = matches[index]?.key;
+    const onAccept = accept;
+
+    dismiss();
+    if (key !== undefined) {
+        onAccept?.(key);
+    }
+}
+
+function isShowing(): boolean {
+    return overlay !== null && overlay.root.classList.contains('is-open');
+}
+
 export function createSuggestionList(options: {
     onAccept: (key: string) => void;
 }): SuggestionListHandle {
-    const list = el('div', { class: 'variable-list', role: 'listbox' });
-    const root = el('div', { class: 'variable-popup' }, list);
+    const token = {};
+    const owns = () => owner === token;
 
-    let matches: Variable[] = [];
-    let activeIndex = 0;
-
-    document.body.appendChild(root);
-
-    const close = () => {
-        matches = [];
-        root.classList.remove('is-open');
-
-        if (closeOpenList === close) {
-            closeOpenList = null;
-        }
-    };
-
-    const render = () => {
-        replace(
-            list,
-            ...matches.map((variable, index) =>
-                el(
-                    'button',
-                    {
-                        class: `variable-option${index === activeIndex ? ' is-active' : ''}`,
-                        type: 'button',
-                        role: 'option',
-                        title: variable.secret
-                            ? variable.key
-                            : `${variable.key} · ${variable.value}`,
-                        attrs: { 'aria-selected': index === activeIndex ? 'true' : 'false' },
-                        on: {
-                            mousedown: (event) => event.preventDefault(),
-                            mouseenter: () => {
-                                activeIndex = index;
-                                render();
-                            },
-                            click: () => {
-                                const key = variable.key;
-
-                                close();
-                                options.onAccept(key);
-                            },
-                        },
-                    },
-                    el('span', { class: 'variable-option-key', text: variable.key }),
-                    el('span', {
-                        class: 'variable-option-value',
-                        text: variable.secret ? '••••••' : variable.value || '(empty)',
-                    })
-                )
-            )
-        );
-
-        const active = list.querySelector('.variable-option.is-active');
-
-        if (active && typeof active.scrollIntoView === 'function') {
-            active.scrollIntoView({ block: 'nearest' });
-        }
-    };
-
-    const place = (anchor: SuggestionAnchor) => {
-        const width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, anchor.width));
-        const viewportWidth = window.innerWidth || width;
-        const viewportHeight = window.innerHeight || anchor.bottom + MAX_HEIGHT;
-        const left = Math.max(8, Math.min(anchor.left, viewportWidth - width - 8));
-        const below = viewportHeight - anchor.bottom;
-        const flip = below < MAX_HEIGHT + 16 && anchor.top > below;
-
-        root.style.width = `${width}px`;
-        root.style.left = `${left}px`;
-
-        if (flip) {
-            root.style.top = 'auto';
-            root.style.bottom = `${viewportHeight - anchor.top + 4}px`;
-        } else {
-            root.style.bottom = 'auto';
-            root.style.top = `${anchor.bottom + 4}px`;
-        }
-    };
+    mount();
 
     return {
-        root,
+        get root() {
+            return mount().root;
+        },
 
-        isOpen: () => root.classList.contains('is-open'),
+        isOpen: () => owns() && isShowing(),
 
         openAt(anchor: SuggestionAnchor, query: string) {
-            matches = matchVariables([...scopedVariables(), ...dynamicAsVariables()], query);
+            const found = matchVariables([...scopedVariables(), ...dynamicAsVariables()], query);
 
-            if (matches.length === 0) {
-                close();
+            if (found.length === 0) {
+                if (owns()) {
+                    dismiss();
+                }
 
                 return false;
             }
 
+            owner = token;
+            accept = options.onAccept;
+            matches = found;
             activeIndex = 0;
-            closeOpenList?.();
-            closeOpenList = close;
-            root.classList.add('is-open');
+            mount().root.classList.add('is-open');
             place(anchor);
             render();
 
             return true;
         },
 
-        close,
+        close() {
+            if (owns()) {
+                dismiss();
+            }
+        },
 
         destroy() {
-            close();
-            root.remove();
+            if (owns()) {
+                dismiss();
+            }
         },
 
         handleKey(event: KeyboardEvent) {
-            if (!root.classList.contains('is-open') || matches.length === 0) {
+            if (!owns() || !isShowing() || matches.length === 0) {
                 return false;
             }
 
@@ -204,18 +248,14 @@ export function createSuggestionList(options: {
 
             if (event.key === 'Enter' || event.key === 'Tab') {
                 event.preventDefault();
-
-                const key = matches[activeIndex].key;
-
-                close();
-                options.onAccept(key);
+                choose(activeIndex);
 
                 return true;
             }
 
             if (event.key === 'Escape') {
                 event.preventDefault();
-                close();
+                dismiss();
 
                 return true;
             }

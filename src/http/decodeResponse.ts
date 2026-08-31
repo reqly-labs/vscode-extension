@@ -44,22 +44,29 @@ function isTextual(mime: string): boolean {
 export function decodeResponse(raw: RawResponse): HttpResponse {
     const contentType = headerValue(raw.headers, 'content-type');
     const mime = mimeType(contentType);
-    const oversized = raw.body.byteLength > MAX_PREVIEW_BYTES;
+    const oversized = raw.size > raw.body.byteLength || raw.body.byteLength > MAX_PREVIEW_BYTES;
     const base = {
         status: raw.status,
         statusText: raw.statusText,
         httpVersion: raw.httpVersion,
         headers: raw.headers,
-        size: raw.body.byteLength,
+        size: raw.size,
         timings: raw.timings,
         contentType,
+        shown: raw.body.byteLength,
         redirects: raw.redirects,
         finalUrl: raw.finalUrl,
         capped: raw.capped,
     };
 
     if (oversized) {
-        return { ...base, body: '', previewUri: null, binary: false, truncated: true };
+        return {
+            ...base,
+            body: isTextual(mime) ? decodeText(raw.body, contentType) : '',
+            previewUri: null,
+            binary: !isTextual(mime),
+            truncated: true,
+        };
     }
 
     if (mime.startsWith('image/')) {

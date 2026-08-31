@@ -1,22 +1,44 @@
 import { emptyKeyValue, type KeyValue } from '../../core/types';
-import { el, replace } from '../dom';
+import { el, reconcile } from '../dom';
 import { icon, iconButton } from '../icons';
-import { createVariableInput } from './variableInput';
+import { createVariableInput, type VariableInputHandle } from './variableInput';
 
 export interface KvEditorHandle {
     root: HTMLElement;
     refresh(): void;
+    destroy(): void;
 }
 
-export function createKvEditor(options: {
-    items: () => KeyValue[];
-    onStructureChange: () => void;
-    onEdit: () => void;
+interface Row {
+    root: HTMLElement;
+    update(item: KeyValue): void;
+    destroy(): void;
+}
+
+export interface KvEditorOptions {
+    items: () => readonly KeyValue[];
+    edit: (change: (items: KeyValue[]) => void) => void;
     keyPlaceholder?: string;
     valuePlaceholder?: string;
     emptyLabel?: string;
-}): KvEditorHandle {
+}
+
+function setFieldValue(field: VariableInputHandle, value: string): void {
+    if (field.input.value === value) {
+        return;
+    }
+
+    field.input.value = value;
+    field.refresh();
+}
+
+export function createKvEditor(options: KvEditorOptions): KvEditorHandle {
     const rows = el('div', { class: 'kv-rows' });
+    const built = new Map<string, Row>();
+    const emptyHint = el('p', {
+        class: 'empty-hint',
+        text: options.emptyLabel ?? 'No entries yet.',
+    });
     const addButton = el(
         'button',
         {
@@ -24,9 +46,7 @@ export function createKvEditor(options: {
             type: 'button',
             on: {
                 click: () => {
-                    options.items().push(emptyKeyValue());
-                    render();
-                    options.onStructureChange();
+                    options.edit((items) => items.push(emptyKeyValue()));
                     rows.querySelector<HTMLInputElement>('.kv-row:last-child .kv-key')?.focus();
                 },
             },
@@ -41,33 +61,26 @@ export function createKvEditor(options: {
         el('div', { class: 'kv-actions' }, addButton)
     );
 
-    function render(): void {
-        const items = options.items();
+    function write(id: string, patch: Partial<KeyValue>): void {
+        options.edit((items) => {
+            const entry = items.find((item) => item.id === id);
 
-        if (items.length === 0) {
-            replace(
-                rows,
-                el('p', { class: 'empty-hint', text: options.emptyLabel ?? 'No entries yet.' })
-            );
-
-            return;
-        }
-
-        replace(rows, ...items.map(buildRow));
+            if (entry) {
+                Object.assign(entry, patch);
+            }
+        });
     }
 
-    function buildRow(item: KeyValue): HTMLElement {
+    function buildRow(item: KeyValue): Row {
+        const id = item.id;
         const toggle = el('input', {
             class: 'kv-check',
             type: 'checkbox',
             checked: item.enabled,
             attrs: { 'aria-label': 'Enable entry' },
             on: {
-                change: (event) => {
-                    item.enabled = (event.target as HTMLInputElement).checked;
-                    row.classList.toggle('is-disabled', !item.enabled);
-                    options.onEdit();
-                },
+                change: (event) =>
+                    write(id, { enabled: (event.target as HTMLInputElement).checked }),
             },
         });
         const keyInput = createVariableInput({
@@ -75,37 +88,29 @@ export function createKvEditor(options: {
             className: 'field kv-key',
             placeholder: options.keyPlaceholder ?? 'Key',
             ariaLabel: options.keyPlaceholder ?? 'Key',
-            onInput: (value) => {
-                item.key = value;
-                options.onEdit();
-            },
+            onInput: (value) => write(id, { key: value }),
         });
         const valueInput = createVariableInput({
             value: item.value,
             className: 'field kv-value',
             placeholder: options.valuePlaceholder ?? 'Value',
             ariaLabel: options.valuePlaceholder ?? 'Value',
-            onInput: (value) => {
-                item.value = value;
-                options.onEdit();
-            },
+            onInput: (value) => write(id, { value }),
         });
         const remove = iconButton(
             'trash',
             'Remove entry',
-            () => {
-                const items = options.items();
-                const index = items.indexOf(item);
+            () =>
+                options.edit((items) => {
+                    const index = items.findIndex((item) => item.id === id);
 
-                if (index >= 0) {
-                    items.splice(index, 1);
-                    render();
-                    options.onStructureChange();
-                }
-            },
+                    if (index >= 0) {
+                        items.splice(index, 1);
+                    }
+                }),
             'is-danger'
         );
-        const row = el(
+        const root = el(
             'div',
             { class: `kv-row${item.enabled ? '' : ' is-disabled'}` },
             toggle,
@@ -114,10 +119,55 @@ export function createKvEditor(options: {
             remove
         );
 
-        return row;
+        return {
+            root,
+            update(next) {
+                toggle.checked = next.enabled;
+                root.classList.toggle('is-disabled', !next.enabled);
+                setFieldValue(keyInput, next.key);
+                setFieldValue(valueInput, next.value);
+            },
+            destroy() {
+                keyInput.destroy();
+                valueInput.destroy();
+            },
+        };
+    }
+
+    function render(): void {
+        const items = options.items();
+        const ids = items.map((item) => item.id);
+
+        for (const [id, row] of [...built]) {
+            if (!ids.includes(id)) {
+                row.destroy();
+                built.delete(id);
+            }
+        }
+
+        const nodes = items.map((item) => {
+            const row = built.get(item.id) ?? buildRow(item);
+
+            built.set(item.id, row);
+            row.update(item);
+
+            return row.root;
+        });
+
+        reconcile(rows, nodes.length > 0 ? nodes : [emptyHint]);
     }
 
     render();
 
-    return { root, refresh: render };
+    return {
+        root,
+        refresh: render,
+        destroy() {
+            for (const row of built.values()) {
+                row.destroy();
+            }
+
+            built.clear();
+        },
+    };
 }

@@ -10,6 +10,7 @@ import {
 import type { HttpMethod, RequestSettings, ResponseTimings } from '../core/types';
 import type { WireRequest } from './buildRequest';
 import { trustedCertificates } from './certificates';
+import { createResponseSink, removeSpill } from './responseSink';
 
 export class TransportError extends Error {
     constructor(
@@ -27,6 +28,8 @@ export interface RawResponse {
     httpVersion: string;
     headers: [string, string][];
     body: Buffer;
+    size: number;
+    spillPath: string | null;
     timings: ResponseTimings;
     redirects: string[];
     finalUrl: string;
@@ -97,6 +100,8 @@ interface Exchange {
     httpVersion: string;
     headers: [string, string][];
     body: Buffer;
+    size: number;
+    spillPath: string | null;
     timings: ResponseTimings;
 }
 
@@ -129,20 +134,41 @@ function performExchange(
                 const decoder = decompressor(headerValue(rawHeaders, 'content-encoding'));
                 const stream = decoder ? response.pipe(decoder) : response;
                 const limit = responseLimit(settings);
-                const chunks: Buffer[] = [];
+                const sink = createResponseSink();
                 let received = 0;
                 let capped = false;
+                let delivered = false;
 
-                const deliver = () =>
-                    resolve({
-                        capped,
-                        status: response.statusCode ?? 0,
-                        statusText: response.statusMessage ?? '',
-                        httpVersion: response.httpVersion,
-                        headers: rawHeaders,
-                        body: Buffer.concat(chunks),
-                        timings: durations(marks, performance.now() - start),
-                    });
+                const deliver = () => {
+                    if (delivered) {
+                        return;
+                    }
+
+                    delivered = true;
+                    const elapsed = performance.now() - start;
+
+                    sink.finish().then(
+                        (body) =>
+                            resolve({
+                                capped,
+                                status: response.statusCode ?? 0,
+                                statusText: response.statusMessage ?? '',
+                                httpVersion: response.httpVersion,
+                                headers: rawHeaders,
+                                body: body.head,
+                                size: body.size,
+                                spillPath: body.spillPath,
+                                timings: durations(marks, elapsed),
+                            }),
+                        (error: Error) =>
+                            reject(
+                                new TransportError(
+                                    'Failed to read the response body.',
+                                    error.message
+                                )
+                            )
+                    );
+                };
 
                 stream.on('data', (chunk: Buffer) => {
                     if (capped) {
@@ -152,13 +178,16 @@ function performExchange(
                     const room = limit - received;
 
                     if (chunk.byteLength <= room) {
-                        chunks.push(chunk);
                         received += chunk.byteLength;
+                        if (!sink.push(chunk)) {
+                            stream.pause();
+                            sink.onceDrained(() => stream.resume());
+                        }
 
                         return;
                     }
 
-                    chunks.push(chunk.subarray(0, room));
+                    sink.push(chunk.subarray(0, room));
                     received = limit;
                     capped = true;
                     request.destroy();
@@ -169,6 +198,7 @@ function performExchange(
                         return;
                     }
 
+                    void sink.discard();
                     reject(new TransportError('Failed to read the response body.', error.message));
                 });
                 stream.on('end', () => {
@@ -341,12 +371,15 @@ export async function executeRequest(
                 httpVersion: exchange.httpVersion,
                 headers: exchange.headers,
                 body: exchange.body,
+                size: exchange.size,
+                spillPath: exchange.spillPath,
                 timings: totals,
                 redirects,
                 finalUrl: url.toString(),
             };
         }
 
+        await removeSpill(exchange.spillPath);
         if (hop >= MAX_REDIRECTS) {
             throw new TransportError(`Too many redirects (stopped after ${MAX_REDIRECTS} hops).`);
         }

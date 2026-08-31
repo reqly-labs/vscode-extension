@@ -87,6 +87,7 @@ export interface HttpResponse {
     timings: ResponseTimings;
     contentType: string;
     body: string;
+    shown: number;
     previewUri: string | null;
     binary: boolean;
     truncated: boolean;

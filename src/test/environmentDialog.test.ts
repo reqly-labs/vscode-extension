@@ -20,12 +20,12 @@ suite('managing environments inside the panel', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [DEV, PROD],
             collection: null,
             dynamic: [],
-        };
+        });
         dialog = harness.createEnvironmentDialog();
         harness.window.document.getElementById('root')?.appendChild(dialog.root);
     });
@@ -205,7 +205,7 @@ suite('editing a variable keeps the field you are in', () => {
 
     setup(() => {
         harness = mountWebview();
-        harness.store.state.environment = {
+        harness.store.setEnvironment({
             activeId: 'e1',
             environments: [
                 {
@@ -221,7 +221,7 @@ suite('editing a variable keeps the field you are in', () => {
             ],
             collection: null,
             dynamic: [],
-        };
+        });
         dialog = harness.createEnvironmentDialog();
         harness.window.document.getElementById('root')?.appendChild(dialog.root);
         dialog.open();
@@ -286,7 +286,7 @@ suite('editing a variable keeps the field you are in', () => {
 
         fields[1].focus();
         commit(fields[0], 'changed');
-        harness.store.emit('environment');
+        harness.store.commit();
 
         assert.equal(
             harness.window.document.activeElement,
@@ -336,29 +336,33 @@ suite('editing a variable keeps the field you are in', () => {
     test('repaints when something other than a value changes', () => {
         const before = values();
 
-        harness.store.state.environment.environments[0].name = 'Renamed';
-        harness.store.emit('environment');
+        harness.store.mutate((draft) => {
+            draft.environment.environments[0].name = 'Renamed';
+        });
+        harness.store.commit();
 
-        assert.notEqual(values()[0], before[0], 'a real change should repaint');
         assert.equal(
             dialog.root.querySelector<HTMLInputElement>('.env-title-field')?.value,
             'Renamed'
         );
+        assert.equal(values()[0], before[0], 'the rows were needlessly rebuilt');
     });
 
     test('repaints when a variable is added somewhere else', () => {
         const before = values();
 
-        harness.store.state.environment.environments[0].variables.push({
-            id: 'v3',
-            key: 'c',
-            value: '3',
-            enabled: true,
-            secret: false,
+        harness.store.mutate((draft) => {
+            draft.environment.environments[0].variables.push({
+                id: 'v3',
+                key: 'c',
+                value: '3',
+                enabled: true,
+                secret: false,
+            });
         });
-        harness.store.emit('environment');
 
         assert.equal(values().length, 3);
-        assert.notEqual(values()[0], before[0], 'the pane should have been rebuilt');
+        assert.equal(values()[2].value, '3');
+        assert.equal(values()[0], before[0], 'the untouched rows were rebuilt');
     });
 });

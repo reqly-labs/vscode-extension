@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- A response larger than the preview limit is now streamed to a file on disk while it arrives, and
+  the first 5 MB are shown with a line saying how much of the body you are looking at. It used to be
+  read into memory in full and then thrown away for preview purposes, so a large body cost memory and
+  showed nothing. Save writes the file straight from disk, so the size that can be saved is no longer
+  bounded by what fits in memory.
+- The response pane shows the beginning of a body that was cut short by the size limit, instead of
+  replacing it with a notice.
+
+### Changed
+
+- The webview keeps its state in a store where reading and subscribing are the same act. A component
+  declares the slice it draws from, and the store calls it back only when that slice actually
+  changes, so a component can no longer read a value without being told when it moves. Every write
+  goes through a single entry point that notifies, replacing the hand-written channels where the
+  writer and the reader each had to name the same channel for the screen to stay in step.
+- Editors redraw the rows that changed instead of rebuilding their tables, so a field keeps the focus
+  and the caret while the rest of the panel follows the state. This already applied to the variables
+  editor; it now applies to query parameters, headers, form fields and the authentication fields.
+- The variable suggestion list is a single overlay shared by every field, instead of one popup per
+  field. A request with many headers no longer puts a popup in the document for each one.
+- `environmentDialog.ts` is split into the scope list, the scope detail, the variable table and the
+  dialog shell.
+
 ## [1.4.1] - 2026-08-29
 
 ### Fixed

@@ -5,17 +5,17 @@ import { post, schedulePersist } from '../bridge';
 import { applyCurl } from '../curlImport';
 import { el, replace } from '../dom';
 import { icon } from '../icons';
-import { emit, on, state } from '../store';
+import { getState, mutate, persistable, watch } from '../store';
 import { createSelect } from './select';
 import { createSettingsMenu } from './settingsMenu';
 import { createVariableInput } from './variableInput';
 
 export function createUrlBar(options: { onSend: () => void; onCancel: () => void }): HTMLElement {
     const shell = el('div', {
-        class: `url-shell method-border-${state.snapshot.method.toLowerCase()}`,
+        class: `url-shell method-border-${getState().snapshot.method.toLowerCase()}`,
     });
     const methodSelect = createSelect<HttpMethod>({
-        value: state.snapshot.method,
+        value: getState().snapshot.method,
         ariaLabel: 'HTTP method',
         className: 'select-method',
         items: HTTP_METHODS.map((method) => ({
@@ -24,18 +24,22 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
             className: `method-${method.toLowerCase()}`,
         })),
         onChange: (method) => {
-            state.snapshot.method = method;
+            mutate((draft) => {
+                draft.snapshot.method = method;
+            });
             shell.className = `url-shell method-border-${method.toLowerCase()}`;
             schedulePersist();
         },
     });
     const url = createVariableInput({
-        value: state.snapshot.url,
+        value: getState().snapshot.url,
         className: 'url-input',
         placeholder: 'https://api.example.com/endpoint',
         ariaLabel: 'Request URL',
         onInput: (value) => {
-            state.snapshot.url = value;
+            mutate((draft) => {
+                draft.snapshot.url = value;
+            });
             schedulePersist();
         },
         onEnter: () => options.onSend(),
@@ -44,7 +48,6 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
 
             if (pasted && applyCurl(pasted)) {
                 event.preventDefault();
-                emit();
                 schedulePersist();
                 post({ type: 'notify', level: 'info', text: 'cURL command imported.' });
 
@@ -65,7 +68,7 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
             class: 'send-btn',
             type: 'button',
             on: {
-                click: () => (state.loading ? options.onCancel() : options.onSend()),
+                click: () => (getState().loading ? options.onCancel() : options.onSend()),
             },
         },
         sendIcon,
@@ -81,22 +84,30 @@ export function createUrlBar(options: { onSend: () => void; onCancel: () => void
         settings.root
     );
 
-    on('method', () => {
-        methodSelect.setValue(state.snapshot.method);
-        shell.className = `url-shell method-border-${state.snapshot.method.toLowerCase()}`;
-    });
-    on('url', () => {
-        if (urlInput.value !== state.snapshot.url) {
-            urlInput.value = state.snapshot.url;
+    watch(
+        (state) => state.snapshot.method,
+        (method) => {
+            methodSelect.setValue(method);
+            shell.className = `url-shell method-border-${method.toLowerCase()}`;
         }
-
-        url.refresh();
-    });
-    on('response', () => {
-        sendButton.classList.toggle('is-loading', state.loading);
-        sendLabel.textContent = state.loading ? 'Cancel' : 'Send';
-        replace(sendIcon, icon(state.loading ? 'stop' : 'send'));
-    });
+    );
+    watch(
+        (state) => state.snapshot.url,
+        (value) => {
+            if (urlInput.value !== value) {
+                urlInput.value = value;
+                url.refresh();
+            }
+        }
+    );
+    watch(
+        (state) => state.loading,
+        (loading) => {
+            sendButton.classList.toggle('is-loading', loading);
+            sendLabel.textContent = loading ? 'Cancel' : 'Send';
+            replace(sendIcon, icon(loading ? 'stop' : 'send'));
+        }
+    );
 
     return bar;
 }
@@ -140,19 +151,23 @@ function createSendMenu(): {
 
     list.append(
         item('copy', 'Copy URL', () => {
-            if (state.snapshot.url.trim()) {
-                post({ type: 'copy', text: state.snapshot.url.trim(), label: 'URL' });
+            const url = getState().snapshot.url.trim();
+
+            if (url) {
+                post({ type: 'copy', text: url, label: 'URL' });
             }
         }),
         item('terminal', 'Copy as cURL', () => {
-            if (!state.snapshot.url.trim()) {
+            const snapshot = persistable().snapshot;
+
+            if (!snapshot.url.trim()) {
                 return;
             }
 
             try {
                 post({
                     type: 'copy',
-                    text: buildCurlCommand(state.snapshot),
+                    text: buildCurlCommand(snapshot),
                     label: 'cURL command',
                 });
             } catch {

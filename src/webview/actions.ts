@@ -1,9 +1,11 @@
 import { flushPersist, post } from './bridge';
-import { emit, state } from './store';
+import { getState, mutate } from './store';
 
 export const EMPTY_URL_MESSAGE = 'Enter a URL before sending the request.';
 
 export function send(): void {
+    const state = getState();
+
     if (state.loading) {
         return;
     }
@@ -14,27 +16,31 @@ export function send(): void {
         return;
     }
 
-    state.requestId += 1;
-    state.loading = true;
-    state.response = null;
-    state.error = null;
-    emit('response');
-    flushPersist();
-    post({
-        type: 'send',
-        requestId: state.requestId,
-        snapshot: state.snapshot,
-        settings: state.settings,
+    const started = mutate((draft) => {
+        draft.requestId += 1;
+        draft.loading = true;
+        draft.response = null;
+        draft.error = null;
+
+        return {
+            requestId: draft.requestId,
+            snapshot: draft.snapshot,
+            settings: draft.settings,
+        };
     });
+
+    flushPersist();
+    post({ type: 'send', ...started });
 }
 
 export function cancel(): void {
-    if (!state.loading) {
+    if (!getState().loading) {
         return;
     }
 
-    state.requestId += 1;
-    state.loading = false;
-    emit('response');
+    mutate((draft) => {
+        draft.requestId += 1;
+        draft.loading = false;
+    });
     post({ type: 'cancel' });
 }

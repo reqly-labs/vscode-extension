@@ -52,7 +52,7 @@ suite('webview request flow', () => {
         harness.store.hydrate(webviewState({ url: 'https://api.example.com/seed' }, 'req-seed'));
         mountUrlBar();
         harness.store.hydrate(webviewState({}, 'req-new'));
-        harness.store.emit('method', 'url', 'params', 'headers', 'body', 'auth');
+        harness.store.commit();
         const input = urlInputOf(harness);
 
         assert.equal(input.value, '', 'the url field must show the request that was just loaded');
@@ -81,8 +81,10 @@ suite('webview request flow', () => {
         harness.store.hydrate(webviewState({ url: 'https://api.example.com/seed' }, 'req-seed'));
         mountUrlBar();
         harness.store.hydrate(webviewState({ url: 'https://api.example.com/new' }, 'req-new'));
-        harness.store.emit('method', 'url');
-        harness.store.state.snapshot.method = 'POST';
+        harness.store.commit();
+        harness.store.mutate((draft) => {
+            draft.snapshot.method = 'POST';
+        });
         sendButtonOf(harness).click();
         const sent = lastOf(harness.posted, 'send');
 
@@ -112,7 +114,7 @@ suite('webview request flow', () => {
                 'req-new'
             )
         );
-        harness.store.emit('params');
+        harness.store.commit();
         const keys =
             harness.window.document.querySelectorAll<HTMLInputElement>('.kv-key .variable-field');
 
@@ -123,8 +125,8 @@ suite('webview request flow', () => {
         );
 
         typeInto(values[0], '2');
-        assert.equal(harness.store.state.snapshot.params[0].value, '2');
-        assert.equal(harness.store.state.snapshot.params[0].key, 'page');
+        assert.equal(harness.store.getState().snapshot.params[0].value, '2');
+        assert.equal(harness.store.getState().snapshot.params[0].key, 'page');
     });
 });
 

@@ -86,6 +86,22 @@ export function replace(node: Element, ...children: Child[]): void {
     append(node, children);
 }
 
+export function reconcile(parent: Element, nodes: Node[]): void {
+    for (const child of [...parent.childNodes]) {
+        if (!nodes.includes(child)) {
+            parent.removeChild(child);
+        }
+    }
+
+    nodes.forEach((node, index) => {
+        const current = parent.childNodes[index];
+
+        if (current !== node) {
+            parent.insertBefore(node, current ?? null);
+        }
+    });
+}
+
 export function escapeHtml(value: string): string {
     return value
         .replace(/&/g, '&amp;')

@@ -122,6 +122,7 @@ export interface EditorHandle {
     setLanguage(language: Language): void;
     getValue(): string;
     focus(): void;
+    destroy(): void;
 }
 
 export function createEditor(options: {
@@ -254,6 +255,7 @@ export function createEditor(options: {
         },
         getValue: () => input.value,
         focus: () => input.focus(),
+        destroy: () => suggestions.destroy(),
     };
 }
 

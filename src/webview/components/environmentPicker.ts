@@ -1,7 +1,7 @@
 import { post } from '../bridge';
 import { el, replace } from '../dom';
 import { icon } from '../icons';
-import { on, state } from '../store';
+import { watch, type ReadonlyAppState } from '../store';
 
 export function createEnvironmentPicker(options: { onManage: () => void }): { root: HTMLElement } {
     const label = el('span', { class: 'env-pick-label' });
@@ -33,8 +33,7 @@ export function createEnvironmentPicker(options: { onManage: () => void }): { ro
         root.classList.remove('is-open');
         post({ type: 'selectEnvironment', id });
     };
-    const paint = () => {
-        const { activeId, environments } = state.environment;
+    const paint = ({ activeId, environments }: ReadonlyAppState['environment']) => {
         const active = environments.find((entry) => entry.id === activeId);
 
         label.textContent = active?.name ?? 'No environment';
@@ -85,8 +84,7 @@ export function createEnvironmentPicker(options: { onManage: () => void }): { ro
             root.classList.remove('is-open');
         }
     });
-    on('environment', paint);
-    paint();
+    watch((state) => state.environment, paint);
 
     return { root };
 }

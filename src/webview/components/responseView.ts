@@ -1,12 +1,25 @@
 import { formatBytes, formatDuration, prettyPrint } from '../../core/format';
-import type { HttpResponse } from '../../core/types';
 import { post, schedulePersist } from '../bridge';
 import { el, replace } from '../dom';
 import { languageFor } from '../highlight';
 import { icon } from '../icons';
-import { on, state } from '../store';
+import { getState, mutate, watch, type ReadonlyAppState } from '../store';
 import { createViewer } from './codeEditor';
 import { createTabs } from './tabs';
+
+type ResponseValue = NonNullable<ReadonlyAppState['response']>;
+
+type ErrorValue = NonNullable<ReadonlyAppState['error']>;
+
+interface Outcome {
+    loading: boolean;
+    error: ErrorValue | null;
+    response: ResponseValue | null;
+}
+
+function selectOutcome(state: ReadonlyAppState): Outcome {
+    return { loading: state.loading, error: state.error, response: state.response };
+}
 
 function statusClass(status: number): string {
     if (status >= 200 && status < 300) {
@@ -24,7 +37,7 @@ function statusClass(status: number): string {
     return 'status-danger';
 }
 
-function fileNameFor(response: HttpResponse): string {
+function fileNameFor(response: ResponseValue): string {
     const type = response.contentType.split(';')[0]?.trim() ?? '';
     const extension = type.includes('json')
         ? 'json'
@@ -41,7 +54,7 @@ export function createResponseView(): HTMLElement {
     const content = el('div', { class: 'pane-host' });
     const meta = el('div', { class: 'response-meta' });
     const head = el('div', { class: 'panel-head response-head' });
-    const viewer = createViewer(state.wrapLines);
+    const viewer = createViewer(getState().wrapLines);
     const bodyPane = el('div', { class: 'pane response-body-pane' });
     const headersPane = el('div', { class: 'pane response-headers' });
     const timelinePane = el('div', { class: 'pane response-timeline' });
@@ -51,9 +64,11 @@ export function createResponseView(): HTMLElement {
             { id: 'headers', label: 'Headers' },
             { id: 'timeline', label: 'Timeline' },
         ],
-        active: state.activeResponseTab,
+        active: getState().activeResponseTab,
         onChange: (id) => {
-            state.activeResponseTab = id;
+            mutate((draft) => {
+                draft.activeResponseTab = id;
+            });
             showPane();
             schedulePersist();
         },
@@ -66,7 +81,7 @@ export function createResponseView(): HTMLElement {
             timeline: timelinePane,
         };
 
-        replace(content, panes[state.activeResponseTab] ?? bodyPane);
+        replace(content, panes[getState().activeResponseTab] ?? bodyPane);
     }
 
     const root = el('section', { class: 'panel response-panel' }, head, meta, content);
@@ -99,7 +114,7 @@ export function createResponseView(): HTMLElement {
         );
     }
 
-    function renderError(): void {
+    function renderError(error: ErrorValue): void {
         replace(head);
         replace(meta);
         replace(
@@ -108,15 +123,13 @@ export function createResponseView(): HTMLElement {
                 'div',
                 { class: 'placeholder is-error' },
                 icon('alert', 'placeholder-icon'),
-                el('p', { class: 'error-title', text: state.error?.message ?? 'Request failed.' }),
-                state.error?.detail
-                    ? el('p', { class: 'error-detail', text: state.error.detail })
-                    : null
+                el('p', { class: 'error-title', text: error.message || 'Request failed.' }),
+                error.detail ? el('p', { class: 'error-detail', text: error.detail }) : null
             )
         );
     }
 
-    function renderMeta(response: HttpResponse): void {
+    function renderMeta(response: ResponseValue): void {
         const stats = el(
             'div',
             { class: 'meta-stats' },
@@ -141,12 +154,16 @@ export function createResponseView(): HTMLElement {
 
         if (!response.binary) {
             actions.append(
-                toggleButton('Pretty', state.prettyPrint, (value) => {
-                    state.prettyPrint = value;
+                toggleButton('Pretty', getState().prettyPrint, (value) => {
+                    mutate((draft) => {
+                        draft.prettyPrint = value;
+                    });
                     renderBody(response);
                 }),
-                toggleButton('Wrap', state.wrapLines, (value) => {
-                    state.wrapLines = value;
+                toggleButton('Wrap', getState().wrapLines, (value) => {
+                    mutate((draft) => {
+                        draft.wrapLines = value;
+                    });
                     viewer.setWrap(value);
                 }),
                 el(
@@ -209,51 +226,26 @@ export function createResponseView(): HTMLElement {
         return button;
     }
 
-    function currentText(response: HttpResponse): string {
-        return state.prettyPrint ? prettyPrint(response.body, response.contentType) : response.body;
+    function currentText(response: ResponseValue): string {
+        return getState().prettyPrint
+            ? prettyPrint(response.body, response.contentType)
+            : response.body;
     }
 
-    function cappedNotice(response: HttpResponse): HTMLElement {
-        return el('p', {
-            class: 'error-detail',
-            text: `The download stopped at ${formatBytes(response.size)}. Raise "Max response size" in the request settings to keep more.`,
-        });
-    }
-
-    function renderBody(response: HttpResponse): void {
-        if (response.truncated) {
-            replace(
-                bodyPane,
-                el(
-                    'div',
-                    { class: 'placeholder' },
-                    icon('alert', 'placeholder-icon'),
-                    el('p', {
-                        text: `The response is ${formatBytes(response.size)}, too large to preview here.`,
-                    }),
-                    response.capped
-                        ? cappedNotice(response)
-                        : el('p', { class: 'error-detail', text: 'Use Save to write it to disk.' })
-                )
-            );
-
-            return;
-        }
-
+    function noticeText(response: ResponseValue): string | null {
         if (response.capped) {
-            replace(
-                bodyPane,
-                el(
-                    'div',
-                    { class: 'placeholder' },
-                    icon('alert', 'placeholder-icon'),
-                    el('p', { text: 'The response was larger than the size limit.' }),
-                    cappedNotice(response)
-                )
-            );
-
-            return;
+            return `The download stopped at ${formatBytes(response.size)}. Raise "Max response size" in the request settings to keep more.`;
         }
+
+        if (response.truncated) {
+            return `Showing the first ${formatBytes(response.shown)} of ${formatBytes(response.size)}. Save writes the whole body to disk.`;
+        }
+
+        return null;
+    }
+
+    function renderBody(response: ResponseValue): void {
+        const notice = noticeText(response);
 
         if (response.previewUri) {
             replace(
@@ -268,17 +260,22 @@ export function createResponseView(): HTMLElement {
             return;
         }
 
-        if (response.binary) {
+        if (response.binary || !response.body) {
             replace(
                 bodyPane,
                 el(
                     'div',
                     { class: 'placeholder' },
-                    icon('file', 'placeholder-icon'),
+                    icon(response.binary ? 'file' : 'alert', 'placeholder-icon'),
                     el('p', {
-                        text: `Binary response (${response.contentType || 'unknown type'}), ${formatBytes(response.size)}.`,
+                        text: response.binary
+                            ? `Binary response (${response.contentType || 'unknown type'}), ${formatBytes(response.size)}.`
+                            : `The response is ${formatBytes(response.size)}, too large to preview here.`,
                     }),
-                    el('p', { class: 'error-detail', text: 'Use Save to write it to disk.' })
+                    el('p', {
+                        class: 'error-detail',
+                        text: notice ?? 'Use Save to write it to disk.',
+                    })
                 )
             );
 
@@ -286,11 +283,15 @@ export function createResponseView(): HTMLElement {
         }
 
         viewer.setContent(currentText(response), languageFor(response.contentType));
-        viewer.setWrap(state.wrapLines);
-        replace(bodyPane, viewer.root);
+        viewer.setWrap(getState().wrapLines);
+        replace(
+            bodyPane,
+            notice ? el('p', { class: 'response-notice', text: notice }) : null,
+            viewer.root
+        );
     }
 
-    function renderHeaders(response: HttpResponse): void {
+    function renderHeaders(response: ResponseValue): void {
         if (response.headers.length === 0) {
             replace(headersPane, el('p', { class: 'empty-hint', text: 'No response headers.' }));
 
@@ -310,7 +311,7 @@ export function createResponseView(): HTMLElement {
         );
     }
 
-    function renderTimeline(response: HttpResponse): void {
+    function renderTimeline(response: ResponseValue): void {
         const { timings } = response;
         const phases: [string, number][] = [
             ['DNS lookup', timings.dns],
@@ -367,7 +368,7 @@ export function createResponseView(): HTMLElement {
         );
     }
 
-    function renderResponse(response: HttpResponse): void {
+    function renderResponse(response: ResponseValue): void {
         replace(head, tabs.root);
         tabs.setBadge(
             'headers',
@@ -380,28 +381,27 @@ export function createResponseView(): HTMLElement {
         showPane();
     }
 
-    on('response', () => {
-        if (state.loading) {
+    watch(selectOutcome, (outcome) => {
+        if (outcome.loading) {
             renderLoading();
 
             return;
         }
 
-        if (state.error) {
-            renderError();
+        if (outcome.error) {
+            renderError(outcome.error);
 
             return;
         }
 
-        if (state.response) {
-            renderResponse(state.response);
+        if (outcome.response) {
+            renderResponse(outcome.response);
 
             return;
         }
 
         renderIdle();
     });
-    renderIdle();
 
     return root;
 }

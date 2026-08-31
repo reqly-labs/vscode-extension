@@ -3,7 +3,7 @@ import type { Auth, AuthApiKey, AuthBasic, AuthBearer, AuthType } from '../../co
 import { el, replace } from '../dom';
 import { icon } from '../icons';
 import { createSelect, type SelectHandle } from './select';
-import { createVariableInput } from './variableInput';
+import { createVariableInput, type VariableInputHandle } from './variableInput';
 
 const AUTH_LABELS: Record<AuthType, string> = {
     none: 'No Auth',
@@ -11,6 +11,17 @@ const AUTH_LABELS: Record<AuthType, string> = {
     basic: 'Basic Auth',
     'api-key': 'API Key',
 };
+
+export interface AuthEditorHandle {
+    root: HTMLElement;
+    refresh(): void;
+    destroy(): void;
+}
+
+export interface AuthEditorOptions {
+    getAuth: () => Auth;
+    setAuth: (auth: Auth) => void;
+}
 
 function defaultAuth(type: AuthType): Auth {
     switch (type) {
@@ -34,25 +45,11 @@ function field(label: string, control: HTMLElement): HTMLElement {
     );
 }
 
-function textInput(
-    value: string,
-    placeholder: string,
-    onInput: (value: string) => void
-): HTMLElement {
-    return createVariableInput({
-        value,
-        className: 'field',
-        placeholder,
-        ariaLabel: placeholder,
-        onInput,
-    }).root;
-}
-
 function secretInput(
     value: string,
     placeholder: string,
     onInput: (value: string) => void
-): HTMLElement {
+): { root: HTMLElement; input: HTMLInputElement } {
     const input = el('input', {
         class: 'field',
         type: 'password',
@@ -79,41 +76,47 @@ function secretInput(
         icon('eye')
     );
 
-    return el('div', { class: 'secret-field' }, input, toggle);
+    return { root: el('div', { class: 'secret-field' }, input, toggle), input };
 }
 
 function hint(...children: (string | Node)[]): HTMLElement {
-    return el(
-        'div',
-        { class: 'hint' },
-        icon('info'),
-        el('p', {}, ...(children as (string | Node)[]))
-    );
+    return el('div', { class: 'hint' }, icon('info'), el('p', {}, ...children));
 }
 
 function code(text: string): HTMLElement {
     return el('code', { text });
 }
 
-export function createAuthEditor(options: {
-    getAuth: () => Auth;
-    setAuth: (auth: Auth) => void;
-    onEdit: () => void;
-}): {
-    root: HTMLElement;
-    refresh(): void;
-} {
+function bearerPreview(prefix: string): string {
+    return `${prefix || 'Bearer'} <token>`;
+}
+
+function setValue(input: HTMLInputElement, value: string): void {
+    if (input.value !== value) {
+        input.value = value;
+    }
+}
+
+function setFieldValue(handle: VariableInputHandle, value: string): void {
+    if (handle.input.value === value) {
+        return;
+    }
+
+    handle.input.value = value;
+    handle.refresh();
+}
+
+export function createAuthEditor(options: AuthEditorOptions): AuthEditorHandle {
     const body = el('div', { class: 'auth-body' });
     let addToSelect: SelectHandle<'header' | 'query'> | null = null;
+    let fields: VariableInputHandle[] = [];
+    let renderedType: AuthType | null = null;
+    let sync: (auth: Auth) => void = () => {};
     const select = createSelect<AuthType>({
         value: options.getAuth().type,
         ariaLabel: 'Authentication type',
         items: AUTH_TYPES.map((type) => ({ value: type, label: AUTH_LABELS[type] })),
-        onChange: (type) => {
-            options.setAuth(defaultAuth(type));
-            render();
-            options.onEdit();
-        },
+        onChange: (type) => options.setAuth(defaultAuth(type)),
     });
     const root = el(
         'div',
@@ -122,57 +125,86 @@ export function createAuthEditor(options: {
         body
     );
 
-    function renderBearer(auth: AuthBearer): Node[] {
-        const preview = code(`${auth.prefix || 'Bearer'} <token>`);
-
-        return [
-            field(
-                'Prefix',
-                textInput(auth.prefix, 'Bearer', (value) => {
-                    auth.prefix = value;
-                    preview.textContent = `${value || 'Bearer'} <token>`;
-                    options.onEdit();
-                })
-            ),
-            field(
-                'Token',
-                secretInput(auth.token, 'your-access-token', (value) => {
-                    auth.token = value;
-                    options.onEdit();
-                })
-            ),
-            hint('Sent as ', preview, ' in the Authorization header.'),
-        ];
+    function patch(changes: Record<string, string>): void {
+        options.setAuth({ ...options.getAuth(), ...changes } as Auth);
     }
 
-    function renderBasic(auth: AuthBasic): Node[] {
-        return [
-            field(
-                'Username',
-                textInput(auth.username, 'username', (value) => {
-                    auth.username = value;
-                    options.onEdit();
-                })
-            ),
-            field(
-                'Password',
-                secretInput(auth.password, 'password', (value) => {
-                    auth.password = value;
-                    options.onEdit();
-                })
-            ),
+    function variableField(
+        value: string,
+        placeholder: string,
+        onInput: (value: string) => void
+    ): VariableInputHandle {
+        const handle = createVariableInput({
+            value,
+            className: 'field',
+            placeholder,
+            ariaLabel: placeholder,
+            onInput,
+        });
+
+        fields.push(handle);
+
+        return handle;
+    }
+
+    function renderBearer(auth: AuthBearer): void {
+        const preview = code(bearerPreview(auth.prefix));
+        const prefix = variableField(auth.prefix, 'Bearer', (value) => patch({ prefix: value }));
+        const token = secretInput(auth.token, 'your-access-token', (value) =>
+            patch({ token: value })
+        );
+
+        replace(
+            body,
+            field('Prefix', prefix.root),
+            field('Token', token.root),
+            hint('Sent as ', preview, ' in the Authorization header.')
+        );
+        sync = (next) => {
+            if (next.type !== 'bearer') {
+                return;
+            }
+
+            setFieldValue(prefix, next.prefix);
+            setValue(token.input, next.token);
+            preview.textContent = bearerPreview(next.prefix);
+        };
+    }
+
+    function renderBasic(auth: AuthBasic): void {
+        const username = variableField(auth.username, 'username', (value) =>
+            patch({ username: value })
+        );
+        const password = secretInput(auth.password, 'password', (value) =>
+            patch({ password: value })
+        );
+
+        replace(
+            body,
+            field('Username', username.root),
+            field('Password', password.root),
             hint(
                 'Credentials are Base64-encoded and sent as ',
                 code('Basic <base64>'),
                 ' in the Authorization header.'
-            ),
-        ];
+            )
+        );
+        sync = (next) => {
+            if (next.type !== 'basic') {
+                return;
+            }
+
+            setFieldValue(username, next.username);
+            setValue(password.input, next.password);
+        };
     }
 
-    function renderApiKey(auth: AuthApiKey): Node[] {
+    function renderApiKey(auth: AuthApiKey): void {
         const target = el('span', {
             text: auth.addTo === 'header' ? 'request headers' : 'query parameters',
         });
+        const key = variableField(auth.key, 'X-API-Key', (value) => patch({ key: value }));
+        const value = secretInput(auth.value, 'your-api-key', (next) => patch({ value: next }));
 
         addToSelect = createSelect<'header' | 'query'>({
             value: auth.addTo,
@@ -181,50 +213,59 @@ export function createAuthEditor(options: {
                 { value: 'header', label: 'Header' },
                 { value: 'query', label: 'Query Param' },
             ],
-            onChange: (value) => {
-                auth.addTo = value;
-                target.textContent = value === 'header' ? 'request headers' : 'query parameters';
-                options.onEdit();
-            },
+            onChange: (addTo) => patch({ addTo }),
         });
-
-        return [
-            field(
-                'Key',
-                textInput(auth.key, 'X-API-Key', (value) => {
-                    auth.key = value;
-                    options.onEdit();
-                })
-            ),
-            field(
-                'Value',
-                secretInput(auth.value, 'your-api-key', (value) => {
-                    auth.value = value;
-                    options.onEdit();
-                })
-            ),
+        replace(
+            body,
+            field('Key', key.root),
+            field('Value', value.root),
             field('Add to', addToSelect.root),
-            hint('The key-value pair is appended to the ', target, '.'),
-        ];
+            hint('The key-value pair is appended to the ', target, '.')
+        );
+        sync = (next) => {
+            if (next.type !== 'api-key') {
+                return;
+            }
+
+            setFieldValue(key, next.key);
+            setValue(value.input, next.value);
+            addToSelect?.setValue(next.addTo);
+            target.textContent = next.addTo === 'header' ? 'request headers' : 'query parameters';
+        };
+    }
+
+    function releaseFields(): void {
+        addToSelect?.destroy();
+        addToSelect = null;
+        fields.forEach((handle) => handle.destroy());
+        fields = [];
     }
 
     function render(): void {
         const auth = options.getAuth();
 
         select.setValue(auth.type);
-        addToSelect?.destroy();
-        addToSelect = null;
+        if (renderedType === auth.type) {
+            sync(auth);
+
+            return;
+        }
+
+        releaseFields();
+        renderedType = auth.type;
         switch (auth.type) {
             case 'bearer':
-                replace(body, ...renderBearer(auth));
+                renderBearer(auth);
                 break;
             case 'basic':
-                replace(body, ...renderBasic(auth));
+                renderBasic(auth);
                 break;
             case 'api-key':
-                replace(body, ...renderApiKey(auth));
+                renderApiKey(auth);
                 break;
             default:
+                sync = () => {};
+
                 replace(
                     body,
                     el('p', { class: 'empty-hint', text: 'This request has no authentication.' })
@@ -234,5 +275,12 @@ export function createAuthEditor(options: {
 
     render();
 
-    return { root, refresh: render };
+    return {
+        root,
+        refresh: render,
+        destroy() {
+            releaseFields();
+            select.destroy();
+        },
+    };
 }
