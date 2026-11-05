@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-05
+
+Large responses stream to disk. A body bigger than the preview no longer has to fit in memory to be
+looked at or saved.
+
 ### Added
 
 - A response larger than the preview limit is now streamed to a file on disk while it arrives, and
@@ -30,6 +35,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   field. A request with many headers no longer puts a popup in the document for each one.
 - `environmentDialog.ts` is split into the scope list, the scope detail, the variable table and the
   dialog shell.
+- Temporary files holding large response bodies are removed on startup once they are a day old, so a
+  window that closed abruptly does not leave them behind for good.
+
+### Fixed
+
+- A compressed response whose connection dropped halfway through the body left the panel waiting
+  until the request was cancelled by hand, because the timeout was not watching it any more. It now
+  fails at once with "The connection closed before the whole response arrived.", the same as an
+  uncompressed body.
 
 ## [1.4.1] - 2026-08-29
 
@@ -239,7 +253,8 @@ that `localhost` services, self-signed certificates and arbitrary headers all wo
   editor themes.
 - `Ctrl+Alt+Enter` / `Cmd+Alt+Enter` keybinding to send the current request from anywhere in VS Code.
 
-[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.4.1...HEAD
+[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.5.0
 [1.4.1]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.4.1
 [1.4.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.4.0
 [1.3.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.3.0

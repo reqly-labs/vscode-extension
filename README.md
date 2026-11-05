@@ -38,7 +38,7 @@ quick to open and quiet in a diff.
 
 Point `reqly.storage.location` at `workspace` and the files land in a `.reqly` folder in the project,
 where they can be reviewed in a pull request and travel with the repository. Edit one by hand, pull a
-change, switch branches: the sidebar follows the files. Credentials never go in them — those live in
+change, switch branches: the sidebar follows the files. Credentials never go in them - those live in
 the operating system keychain, so a collection file is safe to commit.
 
 ### Collections that keep their shape
@@ -48,8 +48,9 @@ nested inside them, and requests anywhere, including loose at the root when a co
 overkill. Create, rename, duplicate, delete and reorder from a right-click menu or by dragging rows
 around. Renaming happens inline, on a double click or `F2`, the way the file explorer works.
 
-Everything is stored globally rather than per project, so your collections are there in every window
-and survive closing VS Code, updating the extension, and restarting the machine.
+By default everything is stored globally rather than per project, so your collections are there in
+every window and survive closing VS Code, updating the extension, and restarting the machine. Switch
+`reqly.storage.location` to `workspace` when a collection belongs with the project instead.
 
 The structure is normalized internally and every operation addresses a single node by its own id,
 never by a parent-plus-child pair. Moving a request while it is open cannot make a later save land on
@@ -119,9 +120,10 @@ clutters your headers tab.
 ### A response inspector that answers questions
 
 Status code, duration and payload size sit above a syntax-highlighted body with pretty-print and line
-wrapping toggles. Images render as an actual preview. Binary and oversized responses are recognized
-instead of dumped as noise, and both can be written straight to disk with **Save**. Full response
-headers get their own tab, with a live count.
+wrapping toggles. Images render as an actual preview. Binary responses are recognized instead of
+dumped as noise, and **Save** writes any response straight to disk. A text body larger than 5 MB shows
+its first 5 MB with a line saying how much of it you are looking at, and an empty body says so instead
+of leaving a blank pane. Full response headers get their own tab, with a live count.
 
 ### A timing waterfall
 
@@ -143,7 +145,7 @@ command, ready to paste into a terminal, a ticket, or a teammate's chat.
 ### Per-request settings
 
 A gear next to the send button controls the request timeout, whether 3xx responses are followed
-automatically, whether TLS certificates are verified, and how much of a response is read into memory.
+automatically, whether TLS certificates are verified, and how much of a response is downloaded.
 The timeout is a deadline for the whole request, shared across the redirect chain, not just a guard
 against an idle socket.
 
@@ -160,9 +162,12 @@ should be.
 
 Responses are decompressed automatically for `gzip`, `deflate` and `brotli`, and text is decoded
 using the charset the server declared rather than a guess. A response is read up to the configured
-size limit and reported as cut short past it, measured after decompression, so an endpoint returning
-far more than you expected cannot exhaust the editor's memory. Long-running requests can be cancelled
-mid-flight with the same button that sent them.
+size limit and reported as cut short past it, measured after decompression. Only the first 5 MB are
+kept in memory; the rest streams to a temporary file while it arrives, so an endpoint returning far
+more than you expected cannot exhaust the editor's memory, and **Save** copies that file instead of
+holding the body. A connection that drops halfway through a body, compressed or not, is reported as
+such rather than left waiting. Long-running requests can be cancelled mid-flight with the same button
+that sent them.
 
 ### At home in your editor
 
@@ -218,7 +223,7 @@ In the collections sidebar:
 
 - **[TypeScript](https://www.typescriptlang.org/)**: the entire extension, strict mode on.
 - **[VS Code Extension API](https://code.visualstudio.com/api)**: `WebviewPanel`, `WebviewView`, view
-  containers, workspace `Memento` persistence.
+  containers, `SecretStorage` and workspace `Memento` persistence.
 - **[Node HTTP/HTTPS](https://nodejs.org/api/http.html)**: the transport, with no third party request
   library in the path.
 - **[@reqly/design-system](https://github.com/reqly-labs/design-system)**: tokens and themes shared
@@ -276,7 +281,7 @@ decisions at all.
 
 ## Extension Settings
 
-Request options — timeout, redirect following, TLS verification, maximum response size — live with
+Request options - timeout, redirect following, TLS verification, maximum response size - live with
 the request itself, behind the gear icon next to the send button, so two workspaces can disagree
 without fighting over a global setting.
 
@@ -303,9 +308,9 @@ the operating system keychain.
 - One request open at a time: opening another replaces what the panel is showing, and sending again
   replaces the request in flight.
 - Deleting is permanent. There is a confirmation prompt, but no undo afterwards.
-- Responses over 5 MB are not previewed in the panel. Use **Save** to write them to disk.
-- Responses are held in memory while they are read, so the size limit is a real ceiling rather than a
-  display threshold. There is no streaming to disk yet.
+- Only the first 5 MB of a response are previewed. The whole body is still available through
+  **Save**, up to the configured size limit.
+- Binary responses other than images are not previewed; use **Save** to inspect them.
 - No cookie jar: a `Set-Cookie` on one response is not sent back on the next request.
 - A variable cannot be filled from a previous response yet: that needs a scripting step, which does
   not exist.

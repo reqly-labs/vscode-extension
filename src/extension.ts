@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
+import { SPILL_MAX_AGE_MS } from './core/constants';
 import { readCertificateFiles, useAdditionalCertificates } from './http/certificates';
+import { pruneSpills } from './http/responseSink';
 import { RequestPanel, type PanelDependencies } from './panel/RequestPanel';
 import { CollectionsViewProvider } from './providers/CollectionsViewProvider';
 import { CollectionStore } from './services/CollectionStore';
@@ -105,6 +107,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     background('move credentials into the keychain', store.migrate());
     background('load certificate authorities', loadCertificateAuthorities());
+    void pruneSpills(SPILL_MAX_AGE_MS);
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('reqly.certificateAuthority')) {

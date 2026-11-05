@@ -21,6 +21,8 @@ type RequestHeaderModule = typeof import('../webview/components/requestHeader');
 
 type EnvironmentDialogModule = typeof import('../webview/components/environmentDialog');
 
+type ResponseViewModule = typeof import('../webview/components/responseView');
+
 export interface WebviewHarness {
     window: JSDOM['window'];
     posted: PanelMessage[];
@@ -33,6 +35,7 @@ export interface WebviewHarness {
     highlight: HighlightModule['highlight'];
     createRequestHeader: RequestHeaderModule['createRequestHeader'];
     createEnvironmentDialog: EnvironmentDialogModule['createEnvironmentDialog'];
+    createResponseView: ResponseViewModule['createResponseView'];
     dispose(): void;
 }
 
@@ -92,6 +95,8 @@ export function mountWebview(): WebviewHarness {
         require('../webview/components/requestHeader') as RequestHeaderModule;
     const { createEnvironmentDialog } =
         require('../webview/components/environmentDialog') as EnvironmentDialogModule;
+    const { createResponseView } =
+        require('../webview/components/responseView') as ResponseViewModule;
 
     return {
         window: dom.window,
@@ -105,6 +110,7 @@ export function mountWebview(): WebviewHarness {
         highlight,
         createRequestHeader,
         createEnvironmentDialog,
+        createResponseView,
         dispose() {
             for (const [name, value] of saved) {
                 if (value === undefined) {

@@ -13,3 +13,5 @@ export const MAX_PREVIEW_BYTES = 5 * 1024 * 1024;
 export const DEFAULT_MAX_RESPONSE_BYTES = 50 * 1024 * 1024;
 
 export const MIN_MAX_RESPONSE_BYTES = 64 * 1024;
+
+export const SPILL_MAX_AGE_MS = 24 * 60 * 60 * 1000;

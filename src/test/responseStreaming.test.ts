@@ -1,13 +1,15 @@
 import * as assert from 'node:assert/strict';
-import { readFile, stat } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import * as http from 'node:http';
 import { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { DEFAULT_MAX_RESPONSE_BYTES } from '../core/constants';
 import { createSettings, createSnapshot, type RequestSettings } from '../core/types';
 import { buildRequest } from '../http/buildRequest';
 import { decodeResponse } from '../http/decodeResponse';
 import { executeRequest, type RawResponse } from '../http/executeRequest';
-import { createResponseSink, removeSpill } from '../http/responseSink';
+import { createResponseSink, pruneSpills, removeSpill } from '../http/responseSink';
 
 const HEAD_BYTES = 64 * 1024;
 
@@ -171,5 +173,37 @@ suite('a body larger than the preview limit', () => {
 
         assert.equal(decoded.truncated, false);
         assert.equal(decoded.shown, decoded.size);
+    });
+});
+
+suite('spill files left behind', () => {
+    let directory: string;
+
+    setup(async () => {
+        directory = await mkdtemp(join(tmpdir(), 'reqly-prune-'));
+    });
+
+    teardown(async () => {
+        await rm(directory, { recursive: true, force: true });
+    });
+
+    test('removes the files older than the limit and keeps the recent ones', async () => {
+        const stale = join(directory, 'body-stale.bin');
+        const fresh = join(directory, 'body-fresh.bin');
+        const day = 24 * 60 * 60 * 1000;
+        const now = Date.now();
+
+        await writeFile(stale, 'old');
+        await writeFile(fresh, 'new');
+        await utimes(stale, new Date(now - 2 * day), new Date(now - 2 * day));
+
+        const removed = await pruneSpills(day, directory, now);
+
+        assert.equal(removed, 1);
+        assert.deepEqual(await readdir(directory), ['body-fresh.bin']);
+    });
+
+    test('does nothing when the directory does not exist yet', async () => {
+        assert.equal(await pruneSpills(0, join(directory, 'missing')), 0);
     });
 });

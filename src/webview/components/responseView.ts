@@ -233,19 +233,41 @@ export function createResponseView(): HTMLElement {
     }
 
     function noticeText(response: ResponseValue): string | null {
+        const parts: string[] = [];
+
+        if (response.truncated && !response.binary) {
+            parts.push(
+                `Showing the first ${formatBytes(response.shown)} of ${formatBytes(response.size)}.`
+            );
+        }
+
         if (response.capped) {
-            return `The download stopped at ${formatBytes(response.size)}. Raise "Max response size" in the request settings to keep more.`;
+            parts.push(
+                `The download stopped at ${formatBytes(response.size)}. Raise "Max response size" in the request settings to keep more.`
+            );
+        } else if (response.truncated) {
+            parts.push('Save writes the whole body to disk.');
         }
 
-        if (response.truncated) {
-            return `Showing the first ${formatBytes(response.shown)} of ${formatBytes(response.size)}. Save writes the whole body to disk.`;
-        }
-
-        return null;
+        return parts.length > 0 ? parts.join(' ') : null;
     }
 
     function renderBody(response: ResponseValue): void {
         const notice = noticeText(response);
+
+        if (response.size === 0) {
+            replace(
+                bodyPane,
+                el(
+                    'div',
+                    { class: 'placeholder' },
+                    icon('inbox', 'placeholder-icon'),
+                    el('p', { text: 'The response has no body.' })
+                )
+            );
+
+            return;
+        }
 
         if (response.previewUri) {
             replace(
@@ -270,7 +292,7 @@ export function createResponseView(): HTMLElement {
                     el('p', {
                         text: response.binary
                             ? `Binary response (${response.contentType || 'unknown type'}), ${formatBytes(response.size)}.`
-                            : `The response is ${formatBytes(response.size)}, too large to preview here.`,
+                            : `The response body (${formatBytes(response.size)}) could not be shown as text.`,
                     }),
                     el('p', {
                         class: 'error-detail',

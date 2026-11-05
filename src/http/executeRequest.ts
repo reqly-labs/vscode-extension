@@ -1,6 +1,6 @@
 import * as http from 'node:http';
 import * as https from 'node:https';
-import type { Duplex } from 'node:stream';
+import { pipeline, type Duplex } from 'node:stream';
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
 import {
     DEFAULT_MAX_RESPONSE_BYTES,
@@ -132,7 +132,7 @@ function performExchange(
                 marks.firstByte = performance.now() - start;
                 const rawHeaders = collectHeaders(response.rawHeaders);
                 const decoder = decompressor(headerValue(rawHeaders, 'content-encoding'));
-                const stream = decoder ? response.pipe(decoder) : response;
+                const stream = decoder ? pipeline(response, decoder, () => {}) : response;
                 const limit = responseLimit(settings);
                 const sink = createResponseSink();
                 let received = 0;
@@ -199,7 +199,7 @@ function performExchange(
                     }
 
                     void sink.discard();
-                    reject(new TransportError('Failed to read the response body.', error.message));
+                    reject(bodyError(error, signal));
                 });
                 stream.on('end', () => {
                     if (!capped) {
@@ -240,6 +240,29 @@ function performExchange(
 
         request.end();
     });
+}
+
+function bodyError(error: NodeJS.ErrnoException, signal: AbortSignal): TransportError {
+    if (error instanceof TransportError) {
+        return error;
+    }
+
+    if (signal.aborted) {
+        return new TransportError('Request cancelled.');
+    }
+
+    if (error.code === 'ECONNRESET' || error.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+        return new TransportError(
+            'The connection closed before the whole response arrived.',
+            error.message
+        );
+    }
+
+    if (error.code?.startsWith('Z_')) {
+        return new TransportError('The response body could not be decompressed.', error.message);
+    }
+
+    return new TransportError('Failed to read the response body.', error.message);
 }
 
 function responseLimit(settings: RequestSettings): number {

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { createWriteStream, type WriteStream } from 'node:fs';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MAX_PREVIEW_BYTES } from '../core/constants';
@@ -31,6 +31,34 @@ export async function removeSpill(path: string | null | undefined): Promise<void
     if (path) {
         await rm(path, { force: true });
     }
+}
+
+export async function pruneSpills(
+    maxAgeMs: number,
+    directory = SPILL_DIRECTORY,
+    now = Date.now()
+): Promise<number> {
+    let names: string[];
+
+    try {
+        names = await readdir(directory);
+    } catch {
+        return 0;
+    }
+
+    let removed = 0;
+
+    for (const name of names) {
+        const path = join(directory, name);
+        const info = await stat(path).catch(() => null);
+
+        if (info?.isFile() && now - info.mtimeMs > maxAgeMs) {
+            await rm(path, { force: true }).catch(() => undefined);
+            removed += 1;
+        }
+    }
+
+    return removed;
 }
 
 export function createResponseSink(headBytes = MAX_PREVIEW_BYTES): ResponseSink {
