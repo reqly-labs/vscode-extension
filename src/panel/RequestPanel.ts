@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { APP_NAME } from '../brand';
 import { pickContainer } from '../commands/collections';
+import { DYNAMIC_VARIABLES } from '../core/dynamicVariables';
 import type {
     ActiveRequestInfo,
     EnvironmentInfo,
@@ -9,16 +10,11 @@ import type {
     WebviewState,
 } from '../core/messages';
 import type { RequestSnapshot } from '../core/types';
-import { DYNAMIC_VARIABLES } from '../core/dynamicVariables';
 import { interpolateSnapshot, unresolvedInSnapshot } from '../core/variables';
 import { ancestorsOf, getRequest, requestLabel, rootCollectionOf } from '../core/workspace';
 import { BuildError, buildRequest } from '../http/buildRequest';
 import { decodeResponse } from '../http/decodeResponse';
-import {
-    executeRequest,
-    TransportError,
-    type RawResponse,
-} from '../http/executeRequest';
+import { executeRequest, TransportError, type RawResponse } from '../http/executeRequest';
 import { removeSpill } from '../http/responseSink';
 import type { EnvironmentService } from '../services/EnvironmentService';
 import type { RequestStateService } from '../services/RequestStateService';

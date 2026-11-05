@@ -72,6 +72,7 @@ function reachable(host: string, port: number): Promise<boolean> {
             resolve(value);
         };
 
+        socket.setTimeout(500, () => settle(false));
         socket.once('connect', () => settle(true));
         socket.once('error', () => settle(false));
     });
