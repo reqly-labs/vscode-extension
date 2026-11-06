@@ -122,8 +122,10 @@ clutters your headers tab.
 Status code, duration and payload size sit above a syntax-highlighted body with pretty-print and line
 wrapping toggles. Images render as an actual preview. Binary responses are recognized instead of
 dumped as noise, and **Save** writes any response straight to disk. A text body larger than 5 MB shows
-its first 5 MB with a line saying how much of it you are looking at, and an empty body says so instead
-of leaving a blank pane. Full response headers get their own tab, with a live count.
+its first 5 MB with a line saying how much of it you are looking at, still pretty-printed when it is
+JSON, and an empty body says so instead of leaving a blank pane. JSON is recognized by its content
+even when the server calls it `text/plain`, and pretty-printing never rewrites a value: a 64-bit id
+keeps every digit. Full response headers get their own tab, with a live count.
 
 ### A timing waterfall
 

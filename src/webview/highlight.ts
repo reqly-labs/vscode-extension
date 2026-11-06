@@ -1,7 +1,8 @@
-import { escapeHtml } from './dom';
+import type { BodyKind } from '../core/format';
 import { findVariableTokens } from '../core/variables';
+import { escapeHtml } from './dom';
 
-export type Language = 'json' | 'xml' | 'text';
+export type Language = BodyKind;
 
 export interface HighlightOptions {
     variables?: boolean;
@@ -120,18 +121,4 @@ export function highlight(
     }
 
     return language === 'json' ? highlightJson(source, variables) : highlightXml(source, variables);
-}
-
-export function languageFor(contentType: string): Language {
-    const type = contentType.toLowerCase();
-
-    if (type.includes('json')) {
-        return 'json';
-    }
-
-    if (type.includes('xml') || type.includes('html')) {
-        return 'xml';
-    }
-
-    return 'text';
 }

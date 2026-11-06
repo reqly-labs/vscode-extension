@@ -16,9 +16,9 @@ function charset(contentType: string): string {
     return /charset=["']?([^;"']+)/i.exec(contentType)?.[1]?.trim() || 'utf-8';
 }
 
-function decodeText(data: Buffer, contentType: string): string {
+function decodeText(data: Buffer, contentType: string, partial = false): string {
     try {
-        return new TextDecoder(charset(contentType)).decode(data);
+        return new TextDecoder(charset(contentType)).decode(data, { stream: partial });
     } catch {
         return data.toString('utf8');
     }
@@ -62,7 +62,7 @@ export function decodeResponse(raw: RawResponse): HttpResponse {
     if (oversized) {
         return {
             ...base,
-            body: isTextual(mime) ? decodeText(raw.body, contentType) : '',
+            body: isTextual(mime) ? decodeText(raw.body, contentType, true) : '',
             previewUri: null,
             binary: !isTextual(mime),
             truncated: true,

@@ -20,6 +20,10 @@ looked at or saved.
   bounded by what fits in memory.
 - The response pane shows the beginning of a body that was cut short by the size limit, instead of
   replacing it with a notice.
+- **Pretty** formats a JSON body that was cut short, so the first 5 MB of a large response read as
+  indented JSON rather than one long line.
+- JSON is recognized by its content when the server labels it `text/plain` or sends no type at all,
+  as raw file hosts such as GitHub do, so **Pretty** and highlighting work there too.
 
 ### Changed
 
@@ -44,6 +48,8 @@ looked at or saved.
   until the request was cancelled by hand, because the timeout was not watching it any more. It now
   fails at once with "The connection closed before the whole response arrived.", the same as an
   uncompressed body.
+- **Pretty** and **Beautify** keep numbers and strings exactly as they were written. A 64-bit id such
+  as `12345678901234567890` used to lose its last digits, and `1.5e3` came back as `1500`.
 
 ## [1.4.1] - 2026-08-29
 

@@ -140,6 +140,43 @@ suite('format', () => {
         assert.equal(formatJson('{"a":1}'), '{\n  "a": 1\n}');
         assert.equal(formatJson('not json'), 'not json');
     });
+    test('indents JSON the same way JSON.stringify does', () => {
+        const source =
+            '{"a":[1,2,{"b":null}],"c":{},"d":[],"e":"x","f":-1.5,"g":true,"h":[{"i":[]}]}';
+
+        assert.equal(formatJson(source), JSON.stringify(JSON.parse(source), null, 2));
+    });
+    test('keeps strings exactly as written', () => {
+        const source = '{"q":"say \\"hi\\", {not: a, block}","u":"\\u00e9\\\\"}';
+
+        assert.equal(
+            formatJson(source),
+            '{\n  "q": "say \\"hi\\", {not: a, block}",\n  "u": "\\u00e9\\\\"\n}'
+        );
+    });
+    test('keeps numbers as written', () => {
+        assert.equal(formatJson('[-1.5e3,1E+2]'), '[\n  -1.5e3,\n  1E+2\n]');
+    });
+    test('keeps numbers too large for a double', () => {
+        assert.equal(
+            formatJson('{"id":12345678901234567890}'),
+            '{\n  "id": 12345678901234567890\n}'
+        );
+    });
+    test('indents JSON that was cut short', () => {
+        assert.equal(
+            formatJson('[{"id":1,"tags":["a","b"]},{"id":2,"name":"Ar'),
+            '[\n  {\n    "id": 1,\n    "tags": [\n      "a",\n      "b"\n    ]\n  },\n  {\n    "id": 2,\n    "name": "Ar'
+        );
+        assert.equal(formatJson('{"a":{"b":'), '{\n  "a": {\n    "b": ');
+        assert.equal(formatJson('{"ok":tr'), '{\n  "ok": tr');
+    });
+    test('puts each value of newline-delimited JSON on its own line', () => {
+        assert.equal(formatJson('{"a":1}\n{"b":2}'), '{\n  "a": 1\n}\n{\n  "b": 2\n}');
+    });
+    test('refuses brackets that do not match', () => {
+        assert.equal(formatJson('{"a":[1}'), '{"a":[1}');
+    });
     test('indents nested XML', () => {
         assert.equal(formatXml('<a><b>1</b></a>'), '<a>\n  <b>\n    1\n  </b>\n</a>');
     });

@@ -1,7 +1,8 @@
 import { JSDOM } from 'jsdom';
 import * as assert from 'node:assert/strict';
 import { escapeHtml } from '../webview/dom';
-import { highlight, languageFor, type Language } from '../webview/highlight';
+import { bodyKind } from '../core/format';
+import { highlight, type Language } from '../webview/highlight';
 
 const dom = new JSDOM('<!doctype html><body><div id="host"></div></body>');
 const host = dom.window.document.getElementById('host') as HTMLElement;
@@ -99,14 +100,28 @@ suite('highlight preserves the text it is given', () => {
     });
 });
 
-suite('languageFor', () => {
-    test('recognises the content types that get highlighted', () => {
-        assert.equal(languageFor('application/json; charset=utf-8'), 'json');
-        assert.equal(languageFor('application/ld+json'), 'json');
-        assert.equal(languageFor('text/xml'), 'xml');
-        assert.equal(languageFor('text/html'), 'xml');
-        assert.equal(languageFor('text/plain'), 'text');
-        assert.equal(languageFor(''), 'text');
+suite('bodyKind', () => {
+    test('trusts a content type that names the format', () => {
+        assert.equal(bodyKind('', 'application/json; charset=utf-8'), 'json');
+        assert.equal(bodyKind('', 'application/ld+json'), 'json');
+        assert.equal(bodyKind('', 'text/xml'), 'xml');
+        assert.equal(bodyKind('', 'text/html'), 'xml');
+    });
+
+    test('recognises JSON served as plain text or without a type', () => {
+        assert.equal(bodyKind('[{"id":1}]', 'text/plain; charset=utf-8'), 'json');
+        assert.equal(bodyKind('  {"a":true}', ''), 'json');
+    });
+
+    test('recognises JSON that was cut short', () => {
+        assert.equal(bodyKind('[{"id":1},{"name":"abc', 'text/plain'), 'json');
+    });
+
+    test('leaves text that only starts like JSON alone', () => {
+        assert.equal(bodyKind('[INFO] server started', 'text/plain'), 'text');
+        assert.equal(bodyKind('{ hello world }', 'text/plain'), 'text');
+        assert.equal(bodyKind('plain words', 'text/plain'), 'text');
+        assert.equal(bodyKind('', ''), 'text');
     });
 });
 

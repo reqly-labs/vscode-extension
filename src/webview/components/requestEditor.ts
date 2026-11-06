@@ -1,4 +1,5 @@
 import { BODY_TYPES } from '../../core/constants';
+import { formatJson } from '../../core/format';
 import type { BodyType, RequestSnapshot } from '../../core/types';
 import { post, schedulePersist } from '../bridge';
 import { el, replace } from '../dom';
@@ -80,7 +81,8 @@ export function createRequestEditor(): HTMLElement {
                     }
 
                     try {
-                        const pretty = JSON.stringify(JSON.parse(snapshot.body), null, 2);
+                        JSON.parse(snapshot.body);
+                        const pretty = formatJson(snapshot.body);
 
                         editSnapshot((draft) => {
                             draft.body = pretty;

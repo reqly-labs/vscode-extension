@@ -1,7 +1,6 @@
-import { formatBytes, formatDuration, prettyPrint } from '../../core/format';
+import { bodyKind, formatBytes, formatDuration, prettyPrint } from '../../core/format';
 import { post, schedulePersist } from '../bridge';
 import { el, replace } from '../dom';
-import { languageFor } from '../highlight';
 import { icon } from '../icons';
 import { getState, mutate, watch, type ReadonlyAppState } from '../store';
 import { createViewer } from './codeEditor';
@@ -228,7 +227,7 @@ export function createResponseView(): HTMLElement {
 
     function currentText(response: ResponseValue): string {
         return getState().prettyPrint
-            ? prettyPrint(response.body, response.contentType)
+            ? prettyPrint(response.body, bodyKind(response.body, response.contentType))
             : response.body;
     }
 
@@ -304,7 +303,7 @@ export function createResponseView(): HTMLElement {
             return;
         }
 
-        viewer.setContent(currentText(response), languageFor(response.contentType));
+        viewer.setContent(currentText(response), bodyKind(response.body, response.contentType));
         viewer.setWrap(getState().wrapLines);
         replace(
             bodyPane,
