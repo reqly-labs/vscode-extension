@@ -2,7 +2,7 @@ import { bodyKind, formatBytes, formatDuration, prettyPrint } from '../../core/f
 import { post, schedulePersist } from '../bridge';
 import { el, replace } from '../dom';
 import { icon } from '../icons';
-import { getState, mutate, watch, type ReadonlyAppState } from '../store';
+import { mutate, watch, type ReadonlyAppState } from '../store';
 import { createViewer } from './codeEditor';
 import { createTabs } from './tabs';
 
@@ -53,7 +53,7 @@ export function createResponseView(): HTMLElement {
     const content = el('div', { class: 'pane-host' });
     const meta = el('div', { class: 'response-meta' });
     const head = el('div', { class: 'panel-head response-head' });
-    const viewer = createViewer(getState().wrapLines);
+    const viewer = createViewer(false);
     const bodyPane = el('div', { class: 'pane response-body-pane' });
     const headersPane = el('div', { class: 'pane response-headers' });
     const timelinePane = el('div', { class: 'pane response-timeline' });
@@ -63,24 +63,36 @@ export function createResponseView(): HTMLElement {
             { id: 'headers', label: 'Headers' },
             { id: 'timeline', label: 'Timeline' },
         ],
-        active: getState().activeResponseTab,
+        active: 'body',
         onChange: (id) => {
             mutate((draft) => {
                 draft.activeResponseTab = id;
             });
-            showPane();
             schedulePersist();
         },
     });
+    const panes: Record<string, HTMLElement> = {
+        body: bodyPane,
+        headers: headersPane,
+        timeline: timelinePane,
+    };
+    const prettyButton = toggleButton('Pretty', () => {
+        mutate((draft) => {
+            draft.prettyPrint = !draft.prettyPrint;
+        });
+    });
+    const wrapButton = toggleButton('Wrap', () => {
+        mutate((draft) => {
+            draft.wrapLines = !draft.wrapLines;
+        });
+    });
+
+    let shown: ResponseValue | null = null;
+    let activePane = 'body';
+    let pretty = true;
 
     function showPane(): void {
-        const panes: Record<string, HTMLElement> = {
-            body: bodyPane,
-            headers: headersPane,
-            timeline: timelinePane,
-        };
-
-        replace(content, panes[getState().activeResponseTab] ?? bodyPane);
+        replace(content, panes[activePane] ?? bodyPane);
     }
 
     const root = el('section', { class: 'panel response-panel' }, head, meta, content);
@@ -153,18 +165,8 @@ export function createResponseView(): HTMLElement {
 
         if (!response.binary) {
             actions.append(
-                toggleButton('Pretty', getState().prettyPrint, (value) => {
-                    mutate((draft) => {
-                        draft.prettyPrint = value;
-                    });
-                    renderBody(response);
-                }),
-                toggleButton('Wrap', getState().wrapLines, (value) => {
-                    mutate((draft) => {
-                        draft.wrapLines = value;
-                    });
-                    viewer.setWrap(value);
-                }),
+                prettyButton,
+                wrapButton,
                 el(
                     'button',
                     {
@@ -203,30 +205,17 @@ export function createResponseView(): HTMLElement {
         replace(meta, stats, actions);
     }
 
-    function toggleButton(
-        label: string,
-        active: boolean,
-        onChange: (value: boolean) => void
-    ): HTMLElement {
-        const button = el('button', {
-            class: `ghost-btn${active ? ' is-active' : ''}`,
+    function toggleButton(label: string, onClick: () => void): HTMLElement {
+        return el('button', {
+            class: 'ghost-btn',
             type: 'button',
             text: label,
-            on: {
-                click: () => {
-                    const next = !button.classList.contains('is-active');
-
-                    button.classList.toggle('is-active', next);
-                    onChange(next);
-                },
-            },
+            on: { click: onClick },
         });
-
-        return button;
     }
 
     function currentText(response: ResponseValue): string {
-        return getState().prettyPrint
+        return pretty
             ? prettyPrint(response.body, bodyKind(response.body, response.contentType))
             : response.body;
     }
@@ -304,7 +293,6 @@ export function createResponseView(): HTMLElement {
         }
 
         viewer.setContent(currentText(response), bodyKind(response.body, response.contentType));
-        viewer.setWrap(getState().wrapLines);
         replace(
             bodyPane,
             notice ? el('p', { class: 'response-notice', text: notice }) : null,
@@ -403,6 +391,7 @@ export function createResponseView(): HTMLElement {
     }
 
     watch(selectOutcome, (outcome) => {
+        shown = !outcome.loading && !outcome.error ? outcome.response : null;
         if (outcome.loading) {
             renderLoading();
 
@@ -423,6 +412,34 @@ export function createResponseView(): HTMLElement {
 
         renderIdle();
     });
+
+    watch(
+        (state) => state.activeResponseTab,
+        (id) => {
+            activePane = id in panes ? id : 'body';
+            tabs.setActive(activePane);
+            if (shown) {
+                showPane();
+            }
+        }
+    );
+    watch(
+        (state) => state.prettyPrint,
+        (value) => {
+            pretty = value;
+            prettyButton.classList.toggle('is-active', value);
+            if (shown) {
+                renderBody(shown);
+            }
+        }
+    );
+    watch(
+        (state) => state.wrapLines,
+        (value) => {
+            wrapButton.classList.toggle('is-active', value);
+            viewer.setWrap(value);
+        }
+    );
 
     return root;
 }

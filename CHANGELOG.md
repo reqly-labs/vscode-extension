@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-05
+
+### Fixed
+
+- The response pane draws its active tab, **Pretty** and **Wrap** from the panel state, like the rest
+  of the panel. It used to read them once and then track its own clicks, so a change made anywhere
+  else, such as loading a request saved on another tab, could leave the tab, the button and the body
+  out of step.
+
+### Changed
+
+- The hydration tests load the response tab, the request tab and the response itself, and a new test
+  fails when a field is added to the saved panel state or to the request settings without being
+  covered by them.
+
 ## [1.5.0] - 2026-11-05
 
 Large responses stream to disk. A body bigger than the preview no longer has to fit in memory to be
@@ -259,7 +274,8 @@ that `localhost` services, self-signed certificates and arbitrary headers all wo
   editor themes.
 - `Ctrl+Alt+Enter` / `Cmd+Alt+Enter` keybinding to send the current request from anywhere in VS Code.
 
-[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.5.0...HEAD
+[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.5.1
 [1.5.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.5.0
 [1.4.1]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.4.1
 [1.4.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.4.0

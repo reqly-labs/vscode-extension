@@ -170,6 +170,11 @@ suite('webview hydration', () => {
             harness.createUrlBar({ onSend: harness.actions.send, onCancel: harness.actions.cancel })
         );
         root.appendChild(harness.createRequestEditor());
+        root.appendChild(harness.createResponseView());
+    }
+
+    function activeTab(panel: string): string | undefined {
+        return query(panel).querySelector<HTMLElement>('.tab.is-active')?.dataset.id;
     }
 
     test('repaints every part of the panel when another request is loaded', () => {
@@ -209,9 +214,35 @@ suite('webview hydration', () => {
                     rejectUnauthorized: false,
                     maxResponseSize: 8 * 1024 * 1024,
                 },
+                activeRequestTab: 'auth',
+                activeResponseTab: 'timeline',
             },
             { id: 'req-new', name: 'Listar', location: 'Catálogo' }
         );
+
+        assert.equal(activeTab('.request-panel'), 'auth');
+        harness.store.mutate((draft) => {
+            draft.response = {
+                status: 200,
+                statusText: 'OK',
+                httpVersion: '1.1',
+                headers: [],
+                size: 2,
+                timings: { dns: 0, connect: 0, tls: 0, wait: 0, download: 0, total: 0 },
+                contentType: 'text/plain',
+                body: 'ok',
+                shown: 2,
+                previewUri: null,
+                binary: false,
+                truncated: false,
+                capped: false,
+                redirects: [],
+                finalUrl: 'https://api.example.com/apartamentos',
+            };
+        });
+        assert.equal(activeTab('.response-panel'), 'timeline');
+        assert.ok(query('.response-panel .response-timeline'));
+        clickTab('Params');
 
         assert.equal(
             query<HTMLInputElement>('.url-input .variable-field').value,
@@ -248,6 +279,21 @@ suite('webview hydration', () => {
         assert.deepEqual(
             toggles.map((node) => node.checked),
             [false, false]
+        );
+    });
+
+    test('names every persisted field, so a new one cannot skip the repaint test', () => {
+        const state = harness.store.persistable();
+
+        assert.deepEqual(
+            Object.keys(state).sort(),
+            ['activeRequestId', 'activeRequestTab', 'activeResponseTab', 'settings', 'snapshot'],
+            'a field was added to the persisted state: make the repaint test above load a new value for it and check the panel shows it'
+        );
+        assert.deepEqual(
+            Object.keys(state.settings).sort(),
+            ['followRedirects', 'maxResponseSize', 'rejectUnauthorized', 'timeout'],
+            'a request setting was added: make the repaint test above load a new value for it and check the settings menu shows it'
         );
     });
 

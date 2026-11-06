@@ -275,6 +275,13 @@ on the wrong row or silently do nothing. `WorkspaceService` is the only writer, 
 webview receives a flat list of rows to draw rather than the tree itself, so it makes no structural
 decisions at all.
 
+Inside the panel, `src/webview/store.ts` holds the state, and it has one rule: a component draws only
+from `watch(selector, apply)`. `watch` paints the current value at once and again whenever that
+slice changes, so loading a request, a host message and a click all reach the screen the same way.
+Writes go through `mutate`, which notifies. `getState()` is for event handlers that need the value at
+that moment, never for drawing. The hydration tests load a new value into every persisted field and
+check the panel shows it, and they fail when a field is added without joining them.
+
 ## Requirements
 
 - Visual Studio Code `^1.134.0`.
