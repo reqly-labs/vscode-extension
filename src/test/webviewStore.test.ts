@@ -7,6 +7,7 @@ import {
     isDirty,
     mutate,
     persistable,
+    selectDirty,
     setActive,
     watch,
 } from '../webview/store';
@@ -240,7 +241,7 @@ suite('webview store', () => {
     test('tells a watcher the request became dirty', () => {
         loadRequest({ url: 'https://api.example.com' }, 'req-1');
 
-        const dirty = track((state) => state.baseline !== JSON.stringify(state.snapshot));
+        const dirty = track(selectDirty);
 
         mutate((draft) => {
             draft.snapshot.url = 'https://api.example.com/edited';

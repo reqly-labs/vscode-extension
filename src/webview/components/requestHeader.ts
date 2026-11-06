@@ -30,8 +30,17 @@ export function createRequestHeader(options: {
         el('div', { class: 'request-identity' }, mark, title, trail),
         el('div', { class: 'request-tools' }, environment.root, saveButton)
     );
-    const paint = ({ active, dirty }: { active: ActiveRequestInfo; dirty: boolean }) => {
+    const paint = ({
+        active,
+        dirty,
+        autoSave,
+    }: {
+        active: ActiveRequestInfo;
+        dirty: boolean;
+        autoSave: boolean;
+    }) => {
         const linked = Boolean(active.id);
+        const automatic = linked && autoSave;
 
         title.textContent = linked ? active.name : 'Untitled request';
         title.classList.toggle('is-unsaved', !linked);
@@ -43,14 +52,26 @@ export function createRequestHeader(options: {
         }
 
         mark.classList.toggle('is-hidden', !dirty);
+        mark.title = automatic ? 'Saving changes' : 'Unsaved changes';
         saveLabel.textContent = linked ? 'Save' : 'Save to…';
-        saveButton.classList.toggle('is-active', dirty);
-        saveButton.title = linked
-            ? 'Save changes to this request'
-            : 'Save this request into a collection';
+        saveButton.classList.toggle('is-active', dirty && !automatic);
+        if (!linked) {
+            saveButton.title = 'Save this request into a collection';
+        } else if (automatic) {
+            saveButton.title = 'Changes are saved automatically. Save writes them right away.';
+        } else {
+            saveButton.title = 'Save changes to this request';
+        }
     };
 
-    watch((state) => ({ active: state.active, dirty: selectDirty(state) }), paint);
+    watch(
+        (state) => ({
+            active: state.active,
+            dirty: selectDirty(state),
+            autoSave: state.autoSave,
+        }),
+        paint
+    );
 
     return root;
 }

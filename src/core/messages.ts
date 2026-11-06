@@ -36,6 +36,7 @@ export type HostMessage =
           theme: 'light' | 'dark';
           active: ActiveRequestInfo;
           environment: EnvironmentInfo;
+          autoSave: boolean;
       }
     | {
           type: 'theme';
@@ -45,6 +46,11 @@ export type HostMessage =
           type: 'loadRequest';
           state: WebviewState;
           active: ActiveRequestInfo;
+          keepResponse?: boolean;
+      }
+    | {
+          type: 'autoSave';
+          enabled: boolean;
       }
     | {
           type: 'activeChanged';
@@ -57,6 +63,7 @@ export type HostMessage =
     | {
           type: 'saved';
           active: ActiveRequestInfo;
+          snapshot: RequestSnapshot;
       }
     | {
           type: 'response';

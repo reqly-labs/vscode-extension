@@ -1,6 +1,6 @@
 import type { HostMessage } from '../core/messages';
 import { cancel, send } from './actions';
-import { flushPersist, post } from './bridge';
+import { flushPendingPersist, flushPersist, post } from './bridge';
 import { createEnvironmentDialog } from './components/environmentDialog';
 import { createRequestEditor } from './components/requestEditor';
 import { createRequestHeader, requestSave } from './components/requestHeader';
@@ -8,7 +8,15 @@ import { createResponseView } from './components/responseView';
 import { createSplitView } from './components/splitView';
 import { createUrlBar } from './components/urlBar';
 import { el, replace } from './dom';
-import { getState, hydrate, markSaved, mutate, setActive, setEnvironment } from './store';
+import {
+    getState,
+    hydrate,
+    markSaved,
+    mutate,
+    setActive,
+    setAutoSave,
+    setEnvironment,
+} from './store';
 import './styles.css';
 
 const root = document.getElementById('root') as HTMLElement;
@@ -57,6 +65,7 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
 
     switch (message.type) {
         case 'init':
+            setAutoSave(message.autoSave);
             setEnvironment(message.environment);
             hydrate(message.state, message.active);
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
@@ -66,12 +75,18 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             document.documentElement.classList.toggle('reqly-dark', message.theme === 'dark');
             break;
         case 'loadRequest':
-            mutate((draft) => {
-                draft.response = null;
-                draft.error = null;
-                draft.loading = false;
-            });
+            if (!message.keepResponse) {
+                mutate((draft) => {
+                    draft.response = null;
+                    draft.error = null;
+                    draft.loading = false;
+                });
+            }
+
             hydrate(message.state, message.active);
+            break;
+        case 'autoSave':
+            setAutoSave(message.enabled);
             break;
         case 'activeChanged':
             setActive(message.active);
@@ -80,8 +95,8 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             setEnvironment(message.environment);
             break;
         case 'saved':
-            markSaved();
             setActive(message.active);
+            markSaved(message.snapshot);
             break;
         case 'response':
             if (message.requestId !== getState().requestId) {
@@ -135,6 +150,12 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             });
             flushPersist();
             break;
+    }
+});
+window.addEventListener('blur', flushPendingPersist);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        flushPendingPersist();
     }
 });
 window.addEventListener('keydown', (event) => {

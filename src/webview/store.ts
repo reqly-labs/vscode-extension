@@ -1,3 +1,4 @@
+import { sameValue } from '../core/equal';
 import type { ActiveRequestInfo, EnvironmentInfo, WebviewState } from '../core/messages';
 import type { HttpResponse, RequestError, RequestSettings, RequestSnapshot } from '../core/types';
 import { createSettings, createSnapshot } from '../core/types';
@@ -11,7 +12,8 @@ export interface AppState extends WebviewState {
     wrapLines: boolean;
     active: ActiveRequestInfo;
     environment: EnvironmentInfo;
-    baseline: string;
+    baseline: RequestSnapshot;
+    autoSave: boolean;
 }
 
 export type Immutable<T> = T extends (infer Item)[]
@@ -48,7 +50,8 @@ const current: AppState = {
     wrapLines: true,
     active: { id: null, name: '', location: '' },
     environment: { activeId: null, environments: [], collection: null, dynamic: [] },
-    baseline: '',
+    baseline: createSnapshot(),
+    autoSave: true,
 };
 
 let notifying = false;
@@ -77,24 +80,6 @@ function capture<T>(value: T): T {
     return value;
 }
 
-function same(a: unknown, b: unknown): boolean {
-    if (Object.is(a, b)) {
-        return true;
-    }
-
-    if (Array.isArray(a) && Array.isArray(b)) {
-        return a.length === b.length && a.every((item, index) => same(item, b[index]));
-    }
-
-    if (isPlainObject(a) && isPlainObject(b)) {
-        const keys = Object.keys(a);
-
-        return keys.length === Object.keys(b).length && keys.every((key) => same(a[key], b[key]));
-    }
-
-    return false;
-}
-
 export function getState(): ReadonlyAppState {
     return current as ReadonlyAppState;
 }
@@ -118,7 +103,7 @@ export function commit(): void {
 
                 const next = watcher.select(current as ReadonlyAppState);
 
-                if (same(next, watcher.last)) {
+                if (sameValue(next, watcher.last)) {
                     continue;
                 }
 
@@ -154,12 +139,8 @@ export function watch<T>(select: Selector<T>, apply: (value: T) => void): Unwatc
     };
 }
 
-export function fingerprint(state: ReadonlyAppState = getState()): string {
-    return JSON.stringify(state.snapshot);
-}
-
 export function selectDirty(state: ReadonlyAppState): boolean {
-    return state.baseline !== fingerprint(state);
+    return !sameValue(state.baseline, state.snapshot);
 }
 
 function assignActive(draft: AppState, info: ActiveRequestInfo | undefined): void {
@@ -181,9 +162,15 @@ export function setEnvironment(info: EnvironmentInfo): void {
     });
 }
 
-export function markSaved(): void {
+export function markSaved(saved: RequestSnapshot): void {
     mutate((draft) => {
-        draft.baseline = JSON.stringify(draft.snapshot);
+        draft.baseline = structuredClone(saved);
+    });
+}
+
+export function setAutoSave(enabled: boolean): void {
+    mutate((draft) => {
+        draft.autoSave = enabled;
     });
 }
 
@@ -219,7 +206,7 @@ export function hydrate(next: WebviewState, active?: ActiveRequestInfo): void {
         draft.activeRequestTab = next.activeRequestTab || 'params';
         draft.activeResponseTab = next.activeResponseTab || 'body';
         assignActive(draft, active ?? { id: next.activeRequestId, name: '', location: '' });
-        draft.baseline = JSON.stringify(draft.snapshot);
+        draft.baseline = structuredClone(draft.snapshot);
     });
 }
 

@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-05
+
+Requests save themselves. Edit one and it is written back to its collection a moment later, without
+reaching for `Ctrl+S`.
+
+### Added
+
+- **Auto save** for every request that belongs to a collection, on by default. A change is written
+  shortly after you stop typing, and at once when you click away from the panel, so nothing is lost
+  when the window closes. **Save** and `Ctrl+S` still write immediately. Turn it off with the new
+  `reqly.autoSave` setting.
+- When the file behind the open request changes on disk, after a `git pull` for instance, the panel
+  loads the new version if it has no unsaved edits, and asks first if it does.
+
+### Fixed
+
+- Changing the method, the URL or anything else in the panel now shows in the sidebar as soon as it
+  is saved. The sidebar showed the last saved version, and edits only reached it on `Ctrl+S`.
+- The unsaved mark compares what is on screen with what was actually written. A save that finished
+  while you were still typing used to clear it, and reopening VS Code used to forget edits that had
+  never been saved.
+
 ## [1.5.1] - 2026-11-05
 
 ### Fixed
@@ -274,7 +296,8 @@ that `localhost` services, self-signed certificates and arbitrary headers all wo
   editor themes.
 - `Ctrl+Alt+Enter` / `Cmd+Alt+Enter` keybinding to send the current request from anywhere in VS Code.
 
-[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.5.1...HEAD
+[unreleased]: https://github.com/reqly-labs/vscode-extension/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.6.0
 [1.5.1]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.5.1
 [1.5.0]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.5.0
 [1.4.1]: https://github.com/reqly-labs/vscode-extension/releases/tag/v1.4.1

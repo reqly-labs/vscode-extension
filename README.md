@@ -83,9 +83,19 @@ credentials belong in an environment.
 
 ### A request panel wired to your collections
 
-Clicking a request in the sidebar opens it in the panel and links the two. The header shows its name,
-the collection and folder it lives in, and a dot when there are unsaved edits. **Save** or `Ctrl+S`
-writes the changes back; an unlinked request offers **Save to…** and asks where it should live.
+Clicking a request in the sidebar opens it in the panel and links the two. The header shows its name
+and the collection and folder it lives in.
+
+Edits save themselves. A moment after you stop typing, the request is written back to its collection,
+so the sidebar shows a new method or URL straight away and nothing is lost if the window closes. The
+dot next to the name only shows while an edit is on its way to disk, and it stays until the version
+on screen is the one that was written, even if you kept typing while an earlier one was saved.
+Clicking away from the panel writes the last edit at once instead of waiting. **Save** or `Ctrl+S`
+still writes immediately, and a request that is not in a collection yet offers **Save to…** and asks
+where it should live. Set `reqly.autoSave` to `false` to keep edits in the panel until you save them.
+
+If the file behind the open request changes on disk, after a `git pull` for instance, the panel loads
+the new version when it has nothing unsaved. When it does, you are asked before anything is replaced.
 
 Renaming, moving or deleting a request from the sidebar while it is open is handled live: the header
 follows the rename, and a delete simply unlinks the panel instead of leaving it pointing at something
@@ -183,21 +193,21 @@ back exactly as you left it in that workspace.
 1. Click the Reqly duck in the Activity Bar.
 2. Hit **New Request** to start a loose request, or **New Collection** to group a few together.
 3. Name it inline, pick a method, type a URL, and press `Enter`.
-4. Press `Ctrl+S` to save your changes back to the request.
+4. Your edits are saved to the request as you make them; `Ctrl+S` saves right away.
 5. Need the same request against more than one server? Open the environment picker in the panel
    header, add an environment, and swap `https://localhost:5208` for `{{baseUrl}}`.
 
 ## Commands
 
-| Command                      | Description                                                           |
-| ---------------------------- | --------------------------------------------------------------------- |
-| `Reqly: New Request`         | Creates a request, opens it in the panel, and starts renaming it.     |
-| `Reqly: New Collection`      | Creates a collection and starts renaming it.                          |
-| `Reqly: Open HTTP Client`    | Opens the request panel in the editor area.                           |
-| `Reqly: Send Request`        | Sends whatever the panel currently holds.                             |
-| `Reqly: Save Request`        | Writes the panel back to its saved request, asking where if unlinked. |
-| `Reqly: Manage Environments` | Opens the variables editor for the collection and every environment.  |
-| `Reqly: Select Environment`  | Picks the environment used to resolve `{{variables}}`.                |
+| Command                      | Description                                                          |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `Reqly: New Request`         | Creates a request, opens it in the panel, and starts renaming it.    |
+| `Reqly: New Collection`      | Creates a collection and starts renaming it.                         |
+| `Reqly: Open HTTP Client`    | Opens the request panel in the editor area.                          |
+| `Reqly: Send Request`        | Sends whatever the panel currently holds.                            |
+| `Reqly: Save Request`        | Writes the panel to its request now, asking where if it is unlinked. |
+| `Reqly: Manage Environments` | Opens the variables editor for the collection and every environment. |
+| `Reqly: Select Environment`  | Picks the environment used to resolve `{{variables}}`.               |
 
 ## Keyboard shortcuts
 
@@ -294,11 +304,12 @@ Request options - timeout, redirect following, TLS verification, maximum respons
 the request itself, behind the gear icon next to the send button, so two workspaces can disagree
 without fighting over a global setting.
 
-Two settings live in `settings.json`, because they describe the machine and the project rather than
-the request:
+Three settings live in `settings.json`, because they describe the machine, the project or how you
+like to work rather than the request:
 
 | Setting                      | Type       | Default    | Description                                                                                                          |
 | ---------------------------- | ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| `reqly.autoSave`             | `boolean`  | `true`     | Save edits to a request that belongs to a collection as you make them. Off, edits wait for **Save**.                 |
 | `reqly.storage.location`     | `string`   | `"global"` | Where collection files are kept: `global` for Reqly's own storage, `workspace` for a `.reqly` folder in the project. |
 | `reqly.certificateAuthority` | `string[]` | `[]`       | Paths to extra PEM certificate authorities to trust, for a root that is not installed in the system store.           |
 

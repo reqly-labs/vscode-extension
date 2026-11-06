@@ -3,7 +3,7 @@
     "publisher": "arturbomtempo-dev",
     "displayName": "Reqly for VS Code",
     "description": "A modern, lightweight HTTP client that brings the Reqly experience directly into VS Code.",
-    "version": "1.5.1",
+    "version": "1.6.0",
     "icon": "media/icon.png",
     "license": "MIT",
     "author": {
@@ -130,6 +130,11 @@
         "configuration": {
             "title": "Reqly",
             "properties": {
+                "reqly.autoSave": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Save edits to a request that belongs to a collection as you make them, the way `files.autoSave` does for files. The **Save** button still writes right away, and it is how a request that is not in a collection gets one. Turn this off to keep edits in the panel until you save them."
+                },
                 "reqly.certificateAuthority": {
                     "type": "array",
                     "items": {

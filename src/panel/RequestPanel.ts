@@ -18,6 +18,7 @@ import { executeRequest, TransportError, type RawResponse } from '../http/execut
 import { removeSpill } from '../http/responseSink';
 import type { EnvironmentService } from '../services/EnvironmentService';
 import type { RequestStateService } from '../services/RequestStateService';
+import { RequestSync } from '../services/RequestSync';
 import type { WorkspaceService } from '../services/WorkspaceService';
 import { renderPanelHtml } from './html';
 
@@ -38,6 +39,7 @@ export class RequestPanel {
     private ready = false;
     private pending: 'send' | 'save' | 'environments' | undefined;
     private activeRequestId: string | null = null;
+    private readonly sync: RequestSync;
     private constructor(
         private readonly panel: vscode.WebviewPanel,
         private readonly extensionUri: vscode.Uri,
@@ -46,6 +48,16 @@ export class RequestPanel {
         this.panel.webview.html = renderPanelHtml(this.panel.webview, this.extensionUri);
         this.panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'mascot.png');
         this.activeRequestId = this.validLink(this.store.read().activeRequestId);
+        this.sync = new RequestSync(this.deps.workspaceService, {
+            activeId: () => this.activeRequestId,
+            autoSave: autoSaveEnabled,
+            saved: (snapshot) =>
+                this.send({ type: 'saved', active: this.describeActive(), snapshot }),
+            reload: (snapshot) => this.showStored(snapshot),
+            conflict: () => this.askToLoadFromDisk(),
+            lost: (snapshot, reason) => this.relinkAfterLoss(snapshot, reason),
+        });
+        this.sync.track(this.sync.stored());
         this.disposables.push(
             this.panel.webview.onDidReceiveMessage((message: PanelMessage) => this.handle(message)),
             vscode.window.onDidChangeActiveColorTheme(() =>
@@ -54,11 +66,19 @@ export class RequestPanel {
             this.deps.workspaceService.onDidChange(({ removedIds }) => {
                 if (this.activeRequestId && removedIds.includes(this.activeRequestId)) {
                     this.activeRequestId = null;
+                    this.sync.forget();
                     void this.persistLink();
                 }
 
                 if (this.ready) {
                     this.send({ type: 'activeChanged', active: this.describeActive() });
+                }
+
+                void this.sync.diskChanged();
+            }),
+            vscode.workspace.onDidChangeConfiguration((event) => {
+                if (event.affectsConfiguration('reqly.autoSave')) {
+                    this.autoSaveChanged();
                 }
             })
         );
@@ -119,6 +139,7 @@ export class RequestPanel {
         }
 
         this.activeRequestId = id;
+        this.sync.track(node.snapshot);
         this.deps.onActiveChanged?.();
         const state: WebviewState = {
             ...this.store.read(),
@@ -259,29 +280,37 @@ export class RequestPanel {
 
     private async handle(message: PanelMessage): Promise<void> {
         switch (message.type) {
-            case 'ready':
+            case 'ready': {
+                const restored = await this.store.readWithSecret();
+                const stored = this.sync.stored();
+
                 this.ready = true;
+                this.sync.showing(restored.snapshot);
                 this.send({
                     type: 'init',
-                    state: {
-                        ...(await this.store.readWithSecret()),
-                        activeRequestId: this.activeRequestId,
-                    },
+                    state: { ...restored, activeRequestId: this.activeRequestId },
                     theme: this.themeKind(),
                     active: this.describeActive(),
                     environment: this.describeEnvironment(),
+                    autoSave: autoSaveEnabled(),
                     mascotUri: this.panel.webview
                         .asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'mascot.png'))
                         .toString(),
                 });
+                if (stored) {
+                    this.send({ type: 'saved', active: this.describeActive(), snapshot: stored });
+                }
+
                 if (this.pending) {
                     this.send({ type: 'command', name: this.pending });
                     this.pending = undefined;
                 }
 
                 break;
+            }
+
             case 'persist':
-                await this.store.writeFromWebview(message.state, this.activeRequestId);
+                await this.persist(message.state);
                 break;
             case 'save':
                 await this.saveActive(message.snapshot);
@@ -337,6 +366,16 @@ export class RequestPanel {
         }
     }
 
+    private async persist(state: WebviewState): Promise<void> {
+        const id = this.activeRequestId;
+
+        if (!(await this.store.writeFromWebview(state, id)) || !id) {
+            return;
+        }
+
+        await this.guard(this.sync.edited(id, state.snapshot));
+    }
+
     private async saveActive(snapshot: RequestSnapshot): Promise<void> {
         if (!this.activeRequestId) {
             await this.saveAs(snapshot);
@@ -344,23 +383,69 @@ export class RequestPanel {
             return;
         }
 
-        const result = await this.deps.workspaceService.updateSnapshot(
-            this.activeRequestId,
-            snapshot
+        const saved = await this.guard(this.sync.save(this.activeRequestId, snapshot, 'manual'));
+
+        if (saved) {
+            vscode.window.setStatusBarMessage('Request saved', 2000);
+        }
+    }
+
+    private async guard<T>(work: Promise<T>): Promise<T | undefined> {
+        try {
+            return await work;
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+
+            void vscode.window.showWarningMessage(`Reqly could not save the request: ${detail}`);
+
+            return undefined;
+        }
+    }
+
+    private async relinkAfterLoss(snapshot: RequestSnapshot, reason: string): Promise<void> {
+        this.activeRequestId = null;
+        this.sync.forget();
+        this.deps.onActiveChanged?.();
+        this.send({ type: 'activeChanged', active: this.describeActive() });
+        void vscode.window.showWarningMessage(reason);
+        await this.saveAs(snapshot);
+    }
+
+    private async askToLoadFromDisk(): Promise<boolean> {
+        const load = 'Load from Disk';
+        const kept = autoSaveEnabled() ? ' and saves them over the change' : '';
+        const answer = await vscode.window.showWarningMessage(
+            `"${this.describeActive().name}" changed on disk while the panel had edits that were not saved yet. The panel keeps your edits${kept}.`,
+            load
         );
 
-        if (!result.ok) {
-            this.activeRequestId = null;
-            this.deps.onActiveChanged?.();
-            this.send({ type: 'activeChanged', active: this.describeActive() });
-            void vscode.window.showWarningMessage(result.reason);
-            await this.saveAs(snapshot);
+        return answer === load;
+    }
 
-            return;
+    private async showStored(snapshot: RequestSnapshot): Promise<void> {
+        const state: WebviewState = {
+            ...this.store.read(),
+            snapshot,
+            activeRequestId: this.activeRequestId,
+        };
+
+        await this.store.write(state);
+        if (this.ready) {
+            this.send({
+                type: 'loadRequest',
+                state,
+                active: this.describeActive(),
+                keepResponse: true,
+            });
+        }
+    }
+
+    private autoSaveChanged(): void {
+        if (this.ready) {
+            this.send({ type: 'autoSave', enabled: autoSaveEnabled() });
         }
 
-        this.send({ type: 'saved', active: this.describeActive() });
-        vscode.window.setStatusBarMessage('Request saved', 2000);
+        void this.guard(this.sync.autoSaveTurnedOn());
     }
 
     private async saveAs(snapshot: RequestSnapshot): Promise<void> {
@@ -398,9 +483,10 @@ export class RequestPanel {
         }
 
         this.activeRequestId = result.id;
+        this.sync.track(snapshot);
         this.deps.onActiveChanged?.();
         await this.persistLink();
-        this.send({ type: 'saved', active: this.describeActive() });
+        this.send({ type: 'saved', active: this.describeActive(), snapshot });
         vscode.window.setStatusBarMessage(`Saved as "${name.trim()}"`, 2500);
     }
 
@@ -530,6 +616,10 @@ export class RequestPanel {
         this.disposables.forEach((disposable) => disposable.dispose());
         this.panel.dispose();
     }
+}
+
+function autoSaveEnabled(): boolean {
+    return vscode.workspace.getConfiguration('reqly').get<boolean>('autoSave', true);
 }
 
 function toPanelError(error: unknown): {
